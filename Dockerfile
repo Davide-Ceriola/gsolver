@@ -59,7 +59,7 @@ RUN python3 -m venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
 RUN pip install --upgrade pip
 # Required Python packages for the examples/scripts.
-RUN pip install rerun-sdk pyyaml numpy matplotlib
+RUN pip install rerun-sdk==0.39.0 pyyaml numpy matplotlib
 
 # Set working directory
 WORKDIR /workspace

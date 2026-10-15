@@ -60,9 +60,12 @@ endif()
 
 # --- Rerun SDK ---
 message(STATUS "Fetching Rerun SDK...")
+# Pinned: "latest" would change the build whenever Rerun releases. Keep in step with the
+# Python rerun-sdk (Dockerfile), so the viewer and the SDK match.
 FetchContent_Declare(
     rerun_sdk
-    URL https://github.com/rerun-io/rerun/releases/latest/download/rerun_cpp_sdk.zip
+    URL https://github.com/rerun-io/rerun/releases/download/0.39.0/rerun_cpp_sdk.zip
+    URL_HASH SHA256=fa1bee23b3669c5bafbae13132f8521db38e073a4593d1fb486e0d7d05425c8e
 )
 FetchContent_MakeAvailable(rerun_sdk)
 
