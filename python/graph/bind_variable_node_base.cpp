@@ -14,6 +14,9 @@ namespace gsolver {
     void bind_variable_node_base(nb::module_& m) {
       nb::class_<VariableNodeBase>(m, "VariableNodeBase", "Base class for variable nodes")
         .def_ro("id", &VariableNodeBase::id_, "Variable node ID")
+        .def_rw("initial_guess_is_prior",
+                &VariableNodeBase::initial_guess_is_prior_,
+                "Legacy (True): with a single factor, keep sending the initial guess. False: send zero precision.")
         .def(
           "send_message",
           static_cast<void (VariableNodeBase::*)(size_t)>(&VariableNodeBase::sendMessage),

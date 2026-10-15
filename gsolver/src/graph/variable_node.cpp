@@ -22,8 +22,13 @@ namespace gsolver {
       return;
     }
 
-    // If there are not enough factors skip the message computation
+    // With a single factor there are no other factors to multiply: the message carries no
+    // information. Legacy mode leaves the edge's initial message (the guess) in place instead.
     if (edges_.size() == 1) {
+      if (!initial_guess_is_prior_) {
+        edges_[outedge_id]->variable_to_factor_message_.Lambda_ = MatrixLieDim::Zero();
+        edges_[outedge_id]->variable_to_factor_message_.mu_     = mu_;
+      }
       return;
     }
 
@@ -63,17 +68,8 @@ namespace gsolver {
 
   template <int Dim_, typename EstimateType_, typename EdgeType_>
   void VariableNode<Dim_, EstimateType_, EdgeType_>::sendMessage(const std::string& factor_id) {
-    VectorLieDim tangent_eta         = VectorLieDim::Zero();
-    MatrixLieDim tangent_Lambdaprime = MatrixLieDim::Zero();
-    VectorLieDim tangent_delta_mu    = VectorLieDim::Zero();
-
-    // If there are no factors connected to the variable node, skip the message computation
-    if (edges_.size() == 0) {
-      return;
-    }
-
-    // If there are not enough factors skip the message computation
-    if (edges_.size() == 1) {
+    // Legacy mode sends nothing without at least two factors, so it never needs the edge
+    if (edges_.size() == 0 || (edges_.size() == 1 && initial_guess_is_prior_)) {
       return;
     }
 
@@ -84,40 +80,7 @@ namespace gsolver {
     if (it == edges_.end()) {
       throw std::runtime_error("Edge with the given factor_id not found in VariableNode::sendMessage");
     }
-    const size_t outedge_id = static_cast<size_t>(std::distance(edges_.begin(), it));
-
-    // Multiply inward messages from other factors
-    for (size_t i = 0; i < edges_.size(); ++i) {
-      if (i == outedge_id) {
-        // Skip the outgoing edge
-        continue;
-      }
-
-      // Access messages from edges (TODO: replace with appropriate getter methods based on your edge structure)
-      const MatrixLieDim& Lambdaprime_inward = edges_[i]->factor_to_variable_message_.Lambda_;
-      const EstimateType_ mu_inward          = edges_[i]->factor_to_variable_message_.mu_;
-
-      // Project to the tangent space
-      VectorLieDim tangent_delta_mu_inward = boxminus(mu_inward);
-
-      // Compute the Lambda and eta
-      MatrixLieDim tangent_Lambda_inward = Lambdaprime_inward;
-      VectorLieDim tangent_eta_inward    = tangent_Lambda_inward * tangent_delta_mu_inward;
-
-      tangent_eta += tangent_eta_inward;
-      tangent_Lambdaprime += tangent_Lambda_inward;
-    }
-    // Ensure that the tangent_Lambdaprime is invertible
-    tangent_Lambdaprime += MatrixLieDim::Identity() * 1e-6; // Add a small perturbation to make it invertible
-    // get the perturbation to be applied to the current estimate
-    tangent_delta_mu = tangent_Lambdaprime.inverse() * tangent_eta;
-
-    // compute the new estimate in the manifold
-    EstimateType_ mu_outward         = boxplus(tangent_delta_mu);
-    MatrixLieDim Lambdaprime_outward = tangent_Lambdaprime;
-
-    edges_[outedge_id]->variable_to_factor_message_.Lambda_ = Lambdaprime_outward;
-    edges_[outedge_id]->variable_to_factor_message_.mu_     = mu_outward;
+    sendMessage(static_cast<size_t>(std::distance(edges_.begin(), it)));
   }
 
   template <int Dim_, typename EstimateType_, typename EdgeType_>

@@ -24,6 +24,10 @@ namespace gsolver {
     void bind_factor_graph(nb::module_& m) {
       nb::class_<FactorGraph>(m, "FactorGraph", "Factor graph for Gaussian Belief Propagation")
         .def(nb::init<>(), "Create an empty factor graph")
+        .def_rw("initial_guess_is_prior",
+                &FactorGraph::initial_guess_is_prior_,
+                "Legacy (True): a variable with a single factor keeps sending its initial guess, which acts as a prior. "
+                "False: it sends zero precision, as GBP prescribes. Applied to variables added afterwards.")
 
         // Add variable nodes
         .def(

@@ -42,7 +42,8 @@ namespace {
   };
 
   // Prior on the first pose only, or on every pose
-  void buildChain(Chain& c, int length, std::mt19937& rng, bool prior_on_every_pose) {
+  void buildChain(Chain& c, int length, std::mt19937& rng, bool prior_on_every_pose, bool initial_guess_is_prior = true) {
+    c.graph.initial_guess_is_prior_ = initial_guess_is_prior;
     c.truth.push_back(se2(1.0, -2.0, 0.3));
     for (int k = 1; k < length; ++k) {
       c.truth.push_back(c.truth.back() * se2(1.0, 0.1, 0.2));
@@ -77,7 +78,8 @@ namespace {
     std::vector<Isometry2d> truth;
   };
 
-  void buildTeam(Team& team, InterRobotModel model, int robots, int steps, std::mt19937& rng) {
+  void buildTeam(Team& team, InterRobotModel model, int robots, int steps, std::mt19937& rng, bool initial_guess_is_prior = true) {
+    team.graph.initial_guess_is_prior_ = initial_guess_is_prior;
     std::vector<std::vector<std::shared_ptr<SE2Pose>>> by_robot(robots);
     std::vector<std::vector<Isometry2d>> truth(robots);
 
@@ -146,43 +148,130 @@ TEST(SE2Gbp, ChainConvergesToGroundTruth) {
   EXPECT_LT(maxPoseError(chain.poses, chain.truth), 1e-6);
 }
 
+namespace {
+
+  // Run GBP on the chain, then compare its marginal covariances with a dense solve built
+  // from the same factor Jacobians at the converged estimate. GBP is exact on trees.
+  void expectCovariancesMatchDenseSolve(Chain& chain) {
+    const int n = static_cast<int>(chain.poses.size());
+    GbpSolver solver(SolverScheduleType::SYNCHRONOUS);
+    for (int i = 0; i < 100; ++i) {
+      solver.performIteration(chain.graph);
+    }
+
+    Eigen::MatrixXd H = Eigen::MatrixXd::Zero(3 * n, 3 * n);
+    for (size_t k = 0; k < chain.priors.size(); ++k) {
+      SE2Prior::VectorErrorDim e;
+      SE2Prior::MatrixJacobianDim J;
+      SE2Prior::evaluate(chain.poses[k]->mu_, chain.priors[k]->z_, e, J);
+      H.block<3, 3>(3 * k, 3 * k) += J.transpose() * kPriorSigma.inverse() * J;
+    }
+    for (int k = 0; k + 1 < n; ++k) {
+      SE2Odometry::VectorErrorDim e;
+      SE2Odometry::MatrixJacobianDim J;
+      SE2Odometry::evaluate(chain.poses[k]->mu_, chain.poses[k + 1]->mu_, chain.odometry[k]->z_, e, J);
+      H.block<6, 6>(3 * k, 3 * k) += J.transpose() * kOdometrySigma.inverse() * J;
+    }
+    const Eigen::MatrixXd Sigma_dense = H.inverse();
+
+    for (int k = 0; k < n; ++k) {
+      const Eigen::Matrix3d expected = Sigma_dense.block<3, 3>(3 * k, 3 * k);
+      const Eigen::Matrix3d actual   = chain.poses[k]->Sigma_;
+      EXPECT_LT((actual - expected).norm() / expected.norm(), 1e-4) << "pose " << k << "\nGBP\n"
+                                                                    << actual << "\ndense\n"
+                                                                    << expected;
+    }
+  }
+
+} // namespace
+
 TEST(SE2Gbp, ChainCovariancesMatchDenseSolve) {
   std::mt19937 rng(11);
   Chain chain;
-  const int n = 10;
-  // A prior on every pose keeps every variable connected to at least two factors.
-  // See the note on leaf variables in the test below.
-  buildChain(chain, n, rng, true);
+  // Legacy mode needs every variable to have at least two factors (see the leaf tests below),
+  // so this chain has a prior on every pose
+  buildChain(chain, 10, rng, true);
+  expectCovariancesMatchDenseSolve(chain);
+}
 
+// ---------------------------------------------------------------------------
+// Single-factor variables send zero precision (initial_guess_is_prior_ = false)
+// ---------------------------------------------------------------------------
+
+TEST(SE2Gbp, InitialMessagesAreTheGuessInBothModes) {
+  for (bool initial_guess_is_prior : {true, false}) {
+    std::mt19937 rng(14);
+    Chain chain;
+    buildChain(chain, 3, rng, false, initial_guess_is_prior);
+    for (const auto& pose : chain.poses) {
+      EXPECT_EQ(pose->initial_guess_is_prior_, initial_guess_is_prior);
+      for (const auto& edge : pose->edges_) {
+        EXPECT_TRUE(edge->variable_to_factor_message_.Lambda_.isApprox(kWeakInitialSigma.inverse()));
+        EXPECT_TRUE(edge->variable_to_factor_message_.mu_.isApprox(pose->mu_));
+      }
+    }
+  }
+}
+
+TEST(SE2Gbp, LeafSendsZeroPrecisionAtItsBeliefWhenGuessIsNotPrior) {
+  std::mt19937 rng(15);
+  Chain chain;
+  buildChain(chain, 5, rng, false, false);
+  GbpSolver solver(SolverScheduleType::SYNCHRONOUS);
+  for (int i = 0; i < 20; ++i) {
+    solver.performIteration(chain.graph);
+  }
+  // The last pose is a leaf: its only factor is the last odometry
+  const auto& leaf = chain.poses.back();
+  ASSERT_EQ(leaf->edges_.size(), 1u);
+  const auto& message = leaf->edges_[0]->variable_to_factor_message_;
+  EXPECT_TRUE(message.Lambda_.isZero(0.0));
+  EXPECT_TRUE(message.mu_.isApprox(leaf->mu_));
+}
+
+TEST(SE2Gbp, LeafKeepsInitialMessageInLegacyMode) {
+  std::mt19937 rng(15);
+  Chain chain;
+  buildChain(chain, 5, rng, false, true);
+  const auto& leaf               = chain.poses.back();
+  const Isometry2d initial_guess = leaf->mu_;
+  GbpSolver solver(SolverScheduleType::SYNCHRONOUS);
+  for (int i = 0; i < 20; ++i) {
+    solver.performIteration(chain.graph);
+  }
+  const auto& message = leaf->edges_[0]->variable_to_factor_message_;
+  EXPECT_TRUE(message.Lambda_.isApprox(kWeakInitialSigma.inverse()));
+  EXPECT_TRUE(message.mu_.isApprox(initial_guess));
+}
+
+TEST(SE2Gbp, ChainWithLeafConvergesWhenGuessIsNotPrior) {
+  std::mt19937 rng(16);
+  Chain chain;
+  buildChain(chain, 10, rng, false, false);
   GbpSolver solver(SolverScheduleType::SYNCHRONOUS);
   for (int i = 0; i < 100; ++i) {
     solver.performIteration(chain.graph);
   }
+  EXPECT_LT(maxPoseError(chain.poses, chain.truth), 1e-6);
+}
 
-  // Dense information matrix at the converged estimate, from the same factor Jacobians
-  Eigen::MatrixXd H = Eigen::MatrixXd::Zero(3 * n, 3 * n);
-  for (int k = 0; k < n; ++k) {
-    SE2Prior::VectorErrorDim e;
-    SE2Prior::MatrixJacobianDim J;
-    SE2Prior::evaluate(chain.poses[k]->mu_, chain.priors[k]->z_, e, J);
-    H.block<3, 3>(3 * k, 3 * k) += J.transpose() * kPriorSigma.inverse() * J;
-  }
-  for (int k = 0; k + 1 < n; ++k) {
-    SE2Odometry::VectorErrorDim e;
-    SE2Odometry::MatrixJacobianDim J;
-    SE2Odometry::evaluate(chain.poses[k]->mu_, chain.poses[k + 1]->mu_, chain.odometry[k]->z_, e, J);
-    H.block<6, 6>(3 * k, 3 * k) += J.transpose() * kOdometrySigma.inverse() * J;
-  }
-  const Eigen::MatrixXd Sigma_dense = H.inverse();
+TEST(SE2Gbp, ChainWithLeafCovariancesMatchDenseSolveWhenGuessIsNotPrior) {
+  // The case that fails in legacy mode: prior on the first pose only, so the last pose is a leaf
+  std::mt19937 rng(11);
+  Chain chain;
+  buildChain(chain, 10, rng, false, false);
+  expectCovariancesMatchDenseSolve(chain);
+}
 
-  // GBP is exact on trees: marginal covariances must match the dense ones
-  for (int k = 0; k < n; ++k) {
-    const Eigen::Matrix3d expected = Sigma_dense.block<3, 3>(3 * k, 3 * k);
-    const Eigen::Matrix3d actual   = chain.poses[k]->Sigma_;
-    EXPECT_LT((actual - expected).norm() / expected.norm(), 1e-4) << "pose " << k << "\nGBP\n"
-                                                                  << actual << "\ndense\n"
-                                                                  << expected;
+TEST(SE2Gbp, BearingOnlyTeamConvergesWhenGuessIsNotPrior) {
+  std::mt19937 rng(12);
+  Team team;
+  buildTeam(team, InterRobotModel::BEARING, 4, 5, rng, false);
+  GbpSolver solver(SolverScheduleType::SYNCHRONOUS);
+  for (int i = 0; i < 300; ++i) {
+    solver.performIteration(team.graph);
   }
+  EXPECT_LT(maxPoseError(team.poses, team.truth), 1e-4);
 }
 
 TEST(SE2Gbp, BearingOnlyTeamConvergesToGroundTruth) {

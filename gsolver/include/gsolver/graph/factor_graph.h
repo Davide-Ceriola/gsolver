@@ -12,6 +12,9 @@ namespace gsolver {
     std::vector<std::shared_ptr<VariableNodeBase>> variable_nodes_;
     std::vector<std::shared_ptr<FactorNodeBase>> factor_nodes_;
 
+    // Applied to every variable added afterwards; see VariableNodeBase::initial_guess_is_prior_
+    bool initial_guess_is_prior_ = true;
+
     template <typename VariableType>
     void addVariableNode(const std::shared_ptr<VariableType>& variable_node);
 

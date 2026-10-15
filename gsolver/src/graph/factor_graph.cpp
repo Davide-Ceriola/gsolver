@@ -6,6 +6,7 @@ namespace gsolver {
   template <typename VariableType>
   void FactorGraph::addVariableNode(const std::shared_ptr<VariableType>& variable_node) {
     // Add the variable node to the factor graph
+    variable_node->initial_guess_is_prior_ = initial_guess_is_prior_;
     variable_nodes_.push_back(variable_node);
   }
 
