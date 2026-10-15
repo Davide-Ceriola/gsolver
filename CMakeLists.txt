@@ -41,6 +41,10 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 # =============================================================================
 include(FetchContent)
 
+# Fetched dependencies must not register their own tests; gsolver's tests are
+# controlled by GSOLVER_BUILD_TESTS
+set(BUILD_TESTING OFF CACHE BOOL "Build the tests of fetched dependencies (Eigen)")
+
 # --- Eigen3 ---
 message(STATUS "Fetching Eigen3...")
 FetchContent_Declare(
