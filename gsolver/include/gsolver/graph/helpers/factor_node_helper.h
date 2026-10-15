@@ -2,6 +2,8 @@
 
 #include <Eigen/Dense>
 
+#include <gsolver/maths/symmetric.h>
+
 namespace gsolver {
 
   // compute the marginalization using the Shur complement
@@ -21,9 +23,11 @@ namespace gsolver {
     // Ensure that bb is invertible
     bb += Eigen::Matrix<double, b_size, b_size>::Identity() * 1e-6;
 
-    // Marginalize
-    eta_marg         = ea - ab * bb.inverse() * eb;
-    Lambdaprime_marg = aa - ab * bb.inverse() * ba;
+    // Marginalize: one factorization of bb, solved for both terms
+    const SpdSolver<b_size> bb_solver(bb);
+    eta_marg         = ea - ab * bb_solver.solve(eb);
+    Lambdaprime_marg = aa - ab * bb_solver.solve(ba);
+    symmetrize(Lambdaprime_marg);
   }
 
   // compute the message from the factor node to the variable node
@@ -69,7 +73,7 @@ namespace gsolver {
     Lambdaprime_M += Eigen::Matrix<double, a_size, a_size>::Identity() * 1e-6;
 
     // Update the estimate to send
-    Eigen::Vector<double, a_size> tau                    = Lambdaprime_M.inverse() * eta_M;
+    Eigen::Vector<double, a_size> tau                    = SpdSolver<a_size>(Lambdaprime_M).solve(eta_M);
     EstimateType mu_outward                              = VariableType::boxplus(mu_to_update, tau);
     Eigen::Matrix<double, a_size, a_size> Lambda_outward = Lambdaprime_M;
 

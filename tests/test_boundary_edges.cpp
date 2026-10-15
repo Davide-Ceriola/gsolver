@@ -276,10 +276,10 @@ namespace {
     ASSERT_EQ(split.graphs[0].boundary_edges_.size(), 2u * problem.steps);
     ASSERT_EQ(split.graphs[1].boundary_edges_.size(), 2u * problem.steps);
 
-    // Compared at convergence: payloads round angles through (x, y, theta) and symmetrize
-    // Lambda, so mid-run the two differ by rounding that loopy GBP can amplify (about 1e-5
-    // after 100 iterations); both reach the same fixed point. Exchanging raw Message copies
-    // instead matches at every iteration.
+    // Payloads round angles through (x, y, theta), so the two differ by rounding only; they
+    // match within 1e-9 mid-run too. (Before messages were kept exactly symmetric, dropping the
+    // payload's lower triangle perturbed them enough that loopy GBP amplified it to ~1e-5 at
+    // 100 iterations.) 300 iterations also lets the ground-truth check below converge.
     GbpSolver solver(SolverScheduleType::SYNCHRONOUS);
     for (int iteration = 0; iteration < 300; ++iteration) {
       solver.performIteration(whole.graph);

@@ -19,6 +19,7 @@ FetchContent_MakeAvailable(googletest)
 add_executable(gsolver_tests
     test_boundary_edges.cpp
     test_factor_graph.cpp
+    test_numerics.cpp
     test_se2_factors.cpp
     test_se2_gbp.cpp
 )

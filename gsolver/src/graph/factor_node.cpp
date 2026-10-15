@@ -20,8 +20,10 @@ namespace gsolver {
     // double k = kRHuber(sqrt(error_.transpose() * Sigma_.inverse() * error_));
     double k = 1;
     // Update factor estimate (canonical form)
-    eta_         = J_.transpose() * Sigma_.inverse() * (-error_) * k;
-    Lambdaprime_ = J_.transpose() * Sigma_.inverse() * J_ * k;
+    const MatrixErrorDim Omega = Sigma_.inverse();
+    eta_                       = J_.transpose() * Omega * (-error_) * k;
+    Lambdaprime_               = J_.transpose() * Omega * J_ * k;
+    symmetrize(Lambdaprime_);
 
     // Update Lambda by conditioning on the connected edges
     Lambdaprime_conditioned_ = Lambdaprime_;

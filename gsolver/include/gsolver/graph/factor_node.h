@@ -3,6 +3,7 @@
 #include <Eigen/Dense>
 
 #include <gsolver/core/robust_kernels.h>
+#include <gsolver/maths/symmetric.h>
 #include <gsolver/graph/edge.h>
 #include <gsolver/graph/factor_node_base.h>
 #include <gsolver/graph/helpers/factor_node_edge_tuple_helper.h>

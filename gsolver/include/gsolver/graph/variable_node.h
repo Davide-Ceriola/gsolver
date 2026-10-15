@@ -5,6 +5,7 @@
 
 #include <gsolver/graph/edge.h>
 #include <gsolver/graph/variable_node_base.h>
+#include <gsolver/maths/symmetric.h>
 
 namespace gsolver {
 

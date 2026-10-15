@@ -39,7 +39,7 @@ namespace gsolver {
       double* lambda = payload + VariableType::EncodedSize;
       for (int r = 0; r < LieDim; ++r) {
         for (int c = r; c < LieDim; ++c) {
-          *lambda++ = message.Lambda_(r, c);
+          *lambda++ = 0.5 * (message.Lambda_(r, c) + message.Lambda_(c, r)); // symmetric part
         }
       }
     }

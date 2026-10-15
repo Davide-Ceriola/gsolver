@@ -56,7 +56,7 @@ namespace gsolver {
     // Ensure that the tangent_Lambdaprime is invertible
     tangent_Lambdaprime += MatrixLieDim::Identity() * 1e-6; // Add a small perturbation to make it invertible
     // get the perturbation to be applied to the current estimate
-    tangent_delta_mu = tangent_Lambdaprime.inverse() * tangent_eta;
+    tangent_delta_mu = SpdSolver<Dim_>(tangent_Lambdaprime).solve(tangent_eta);
 
     // compute the new estimate in the manifold
     EstimateType_ mu_outward         = boxplus(tangent_delta_mu);
@@ -140,12 +140,13 @@ namespace gsolver {
     // Ensure that the tangent_Lambdaprime is invertible
     tangent_Lambdaprime += MatrixLieDim::Identity() * 1e-6; // Add a small perturbation to make it invertible
     // get the perturbation to be applied to the current estimate
-    tangent_delta_mu = tangent_Lambdaprime.inverse() * tangent_eta;
+    const SpdSolver<Dim_> solver(tangent_Lambdaprime);
+    tangent_delta_mu = solver.solve(tangent_eta);
 
     // compute and update the estimate in the manifold
-    mu_                      = boxplus(tangent_delta_mu);
-    MatrixLieDim Lambdaprime = tangent_Lambdaprime;
-    Sigma_                   = Lambdaprime.inverse();
+    mu_    = boxplus(tangent_delta_mu);
+    Sigma_ = solver.solve(MatrixLieDim(MatrixLieDim::Identity()));
+    symmetrize(Sigma_);
   }
 
 } // namespace gsolver
