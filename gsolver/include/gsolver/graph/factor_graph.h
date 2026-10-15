@@ -1,5 +1,8 @@
 #pragma once
 
+#include <map>
+#include <utility>
+
 #include <gsolver/graph/edge.h>
 #include <gsolver/graph/factor_node.h>
 #include <gsolver/graph/variable_node.h>
@@ -39,6 +42,36 @@ namespace gsolver {
 
     // returns the pose variable nodes sorted by timestamp
     std::vector<std::shared_ptr<VariableNodeBase>> getPoseVariableNodes(); // TODO: revisit the method
+
+    // -------------------------------------------------------------------------
+    // Boundary edges: the local half of an edge whose other end lives in another graph.
+    // The caller moves payloads between matching halves (see EdgeBase); the solver
+    // itself treats boundary edges like any other edge.
+    // -------------------------------------------------------------------------
+
+    // All boundary edges of this graph, in the order they were created
+    std::vector<std::shared_ptr<EdgeBase>> boundary_edges_;
+
+    // Mark the edge between a local factor and a variable of another graph as FACTOR_SIDE.
+    // Build that factor first with a stand-in for the remote variable: a typed variable node
+    // that is not added to this graph, e.g. addFactorNode(factor, local_variable, remote_stub).
+    // The stub's mean and Sigma seed the edge's incoming message until a payload arrives.
+    std::shared_ptr<EdgeBase> markFactorSideBoundary(const std::string& factor_id,
+                                                     const std::string& variable_id,
+                                                     int remote_id);
+
+    // Give a local variable a VARIABLE_SIDE edge to a factor of another graph
+    std::shared_ptr<EdgeBase> addVariableSideBoundary(const std::string& variable_id,
+                                                      const std::string& factor_id,
+                                                      int remote_id);
+
+    // The boundary edge between factor_id and variable_id, or nullptr
+    std::shared_ptr<EdgeBase> getBoundaryEdge(const std::string& factor_id, const std::string& variable_id) const;
+
+  private:
+    void registerBoundaryEdge(const std::shared_ptr<EdgeBase>& edge);
+
+    std::map<std::pair<std::string, std::string>, std::shared_ptr<EdgeBase>> boundary_index_; // (factor, variable)
   };
 
   template <typename FactorType, typename... GivenVariableTypes>

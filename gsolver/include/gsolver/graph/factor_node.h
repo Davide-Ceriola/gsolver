@@ -44,6 +44,14 @@ namespace gsolver {
       edges_.setEdgeAt(i, edge);
     }
 
+    std::shared_ptr<EdgeBase> getEdgeAt(size_t i) override {
+      return edges_.getEdgeAt(i);
+    }
+
+    size_t numberOfEdges() const override {
+      return NumberOfEdges_;
+    }
+
     // Update the factor based on the connected edges
     void updateFactor() override;
 

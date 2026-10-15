@@ -14,6 +14,8 @@ namespace gsolver {
     virtual ~FactorNodeBase() = default;
 
     virtual void setEdgeAt(size_t i, std::shared_ptr<EdgeBase> edge) = 0; // Set edge at index i
+    virtual std::shared_ptr<EdgeBase> getEdgeAt(size_t i)            = 0; // Edge at index i
+    virtual size_t numberOfEdges() const                             = 0;
     virtual void updateFactor()                                      = 0; // Update the factor based on the connected edges
     virtual void sendMessage(const std::string& variable_id)         = 0;
     virtual void sendAllMessages()                                   = 0;

@@ -84,6 +84,25 @@ namespace gsolver {
   }
 
   template <int Dim_, typename EstimateType_, typename EdgeType_>
+  std::shared_ptr<EdgeBase> VariableNode<Dim_, EstimateType_, EdgeType_>::addDanglingEdge(const std::string& factor_id,
+                                                                                         int remote_id) {
+    auto edge          = std::make_shared<EdgeType_>();
+    edge->variable_id_ = id_;
+    edge->factor_id_   = factor_id;
+    edge->side_        = EdgeSide::VARIABLE_SIDE;
+    edge->remote_id_   = remote_id;
+
+    // Same initial outgoing message as a local edge; nothing received yet
+    edge->variable_to_factor_message_.mu_     = mu_;
+    edge->variable_to_factor_message_.Lambda_ = Sigma_.inverse();
+    edge->factor_to_variable_message_.mu_     = mu_;
+    edge->factor_to_variable_message_.Lambda_ = MatrixLieDim::Zero();
+
+    edges_.push_back(edge);
+    return edge;
+  }
+
+  template <int Dim_, typename EstimateType_, typename EdgeType_>
   void VariableNode<Dim_, EstimateType_, EdgeType_>::sendAllMessages() {
 #pragma omp parallel for
     for (size_t i = 0; i < edges_.size(); ++i) {

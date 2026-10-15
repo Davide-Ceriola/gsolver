@@ -30,6 +30,7 @@ namespace gsolver {
     void sendMessage(const std::string& factor_id) override;
     void sendAllMessages() override;
     void updateMuAndSigma() override;
+    std::shared_ptr<EdgeBase> addDanglingEdge(const std::string& factor_id, int remote_id) override;
 
     // For each new VariableNode, implement the following functions:
     virtual const VectorLieDim boxminus(const EstimateType& mu_inward) = 0;

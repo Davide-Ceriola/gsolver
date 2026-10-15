@@ -17,6 +17,7 @@ FetchContent_MakeAvailable(googletest)
 # Unit tests
 # -----------------------------------------------------------------------------
 add_executable(gsolver_tests
+    test_boundary_edges.cpp
     test_factor_graph.cpp
     test_se2_factors.cpp
     test_se2_gbp.cpp

@@ -15,8 +15,14 @@ namespace gsolver {
   namespace python {
 
     void bind_edge_base(nb::module_& m) {
+      nb::enum_<EdgeSide>(m, "EdgeSide", "Which half of an edge this object is")
+        .value("LOCAL", EdgeSide::LOCAL, "Factor and variable in the same graph")
+        .value("FACTOR_SIDE", EdgeSide::FACTOR_SIDE, "Held by the local factor; the variable is in another graph")
+        .value("VARIABLE_SIDE", EdgeSide::VARIABLE_SIDE, "Held by the local variable; the factor is in another graph");
+
       nb::class_<EdgeBase>(m, "EdgeBase", "Base class for graph edges")
-        .def(nb::init<>(), "Create an empty edge base")
+        .def_prop_ro("side", [](const EdgeBase& edge) { return edge.side_; }, "Which half of an edge this is")
+        .def_prop_ro("remote_id", [](const EdgeBase& edge) { return edge.remote_id_; }, "Graph holding the other half, or -1")
 
         // Properties
         .def_prop_ro(

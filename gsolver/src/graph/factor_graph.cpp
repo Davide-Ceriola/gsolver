@@ -65,6 +65,61 @@ namespace gsolver {
     return nullptr;
   }
 
+  std::shared_ptr<EdgeBase> FactorGraph::markFactorSideBoundary(const std::string& factor_id,
+                                                                const std::string& variable_id,
+                                                                int remote_id) {
+    if (getVariableNode(variable_id)) {
+      throw std::runtime_error("markFactorSideBoundary: variable " + variable_id +
+                               " is in this graph, so its edge to " + factor_id + " is not a boundary");
+    }
+    std::shared_ptr<FactorNodeBase> factor = getFactorNode(factor_id);
+    if (!factor) {
+      throw std::runtime_error("markFactorSideBoundary: factor " + factor_id + " not found");
+    }
+    for (size_t i = 0; i < factor->numberOfEdges(); ++i) {
+      std::shared_ptr<EdgeBase> edge = factor->getEdgeAt(i);
+      if (edge->variable_id_ == variable_id) {
+        edge->side_      = EdgeSide::FACTOR_SIDE;
+        edge->remote_id_ = remote_id;
+        registerBoundaryEdge(edge);
+        return edge;
+      }
+    }
+    throw std::runtime_error("markFactorSideBoundary: factor " + factor_id + " has no edge to " + variable_id);
+  }
+
+  std::shared_ptr<EdgeBase> FactorGraph::addVariableSideBoundary(const std::string& variable_id,
+                                                                 const std::string& factor_id,
+                                                                 int remote_id) {
+    if (getFactorNode(factor_id)) {
+      throw std::runtime_error("addVariableSideBoundary: factor " + factor_id +
+                               " is in this graph, so its edge to " + variable_id + " is not a boundary");
+    }
+    std::shared_ptr<VariableNodeBase> variable = getVariableNode(variable_id);
+    if (!variable) {
+      throw std::runtime_error("addVariableSideBoundary: variable " + variable_id + " not found");
+    }
+    if (getBoundaryEdge(factor_id, variable_id)) {
+      throw std::runtime_error("addVariableSideBoundary: edge " + factor_id + " - " + variable_id + " already exists");
+    }
+    std::shared_ptr<EdgeBase> edge = variable->addDanglingEdge(factor_id, remote_id);
+    registerBoundaryEdge(edge);
+    return edge;
+  }
+
+  std::shared_ptr<EdgeBase> FactorGraph::getBoundaryEdge(const std::string& factor_id, const std::string& variable_id) const {
+    const auto it = boundary_index_.find({factor_id, variable_id});
+    return it == boundary_index_.end() ? nullptr : it->second;
+  }
+
+  void FactorGraph::registerBoundaryEdge(const std::shared_ptr<EdgeBase>& edge) {
+    const auto inserted = boundary_index_.emplace(std::make_pair(edge->factor_id_, edge->variable_id_), edge);
+    if (!inserted.second) {
+      throw std::runtime_error("Boundary edge " + edge->factor_id_ + " - " + edge->variable_id_ + " already registered");
+    }
+    boundary_edges_.push_back(edge);
+  }
+
   // returns the pose variable nodes sorted by timestamp
   std::vector<std::shared_ptr<VariableNodeBase>> FactorGraph::getPoseVariableNodes() {
     std::vector<std::shared_ptr<VariableNodeBase>> pose_variable_nodes;

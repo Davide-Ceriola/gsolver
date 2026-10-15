@@ -1,5 +1,8 @@
 #pragma once
 
+#include <memory>
+#include <string>
+
 #include <gsolver/graph/edge_base.h>
 
 class VariableNodeBase {
@@ -23,4 +26,8 @@ public:
   virtual void sendMessage(const std::string& factor_id) = 0;
   virtual void sendAllMessages()              = 0;
   virtual void updateMuAndSigma()             = 0;
+
+  // Add an edge to a factor that lives in another graph (marked VARIABLE_SIDE). Its incoming
+  // message starts with zero precision at the current mean, until a payload is received.
+  virtual std::shared_ptr<gsolver::EdgeBase> addDanglingEdge(const std::string& factor_id, int remote_id) = 0;
 };
