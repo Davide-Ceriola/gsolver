@@ -4,6 +4,12 @@
 
 namespace gsolver {
 
+  //! Precision added (times identity) to messages, beliefs and the blocks marginalized out,
+  //! so they stay invertible when a direction carries no information. It is a tiny amount of
+  //! artificial information: code that turns a message into a factor (e.g. folding a dropped
+  //! pose into a prior) should subtract it, or it is counted again.
+  constexpr double kInformationRegularization = 1e-6;
+
   //! Replace M by its symmetric part, (M + M^T) / 2. Precision and covariance matrices are
   //! symmetric by definition; this removes the antisymmetric part that rounding leaves behind,
   //! so it cannot accumulate across iterations.

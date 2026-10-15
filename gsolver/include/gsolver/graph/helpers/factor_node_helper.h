@@ -21,7 +21,7 @@ namespace gsolver {
     Eigen::Matrix<double, b_size, a_size> ba = Lambdaprime.block(a_size, 0, b_size, a_size);
     Eigen::Matrix<double, b_size, b_size> bb = Lambdaprime.block(a_size, a_size, b_size, b_size);
     // Ensure that bb is invertible
-    bb += Eigen::Matrix<double, b_size, b_size>::Identity() * 1e-6;
+    bb += Eigen::Matrix<double, b_size, b_size>::Identity() * kInformationRegularization;
 
     // Marginalize: one factorization of bb, solved for both terms
     const SpdSolver<b_size> bb_solver(bb);
@@ -70,7 +70,7 @@ namespace gsolver {
     }
 
     // ensure that the Lambdaprime_marg is invertible
-    Lambdaprime_M += Eigen::Matrix<double, a_size, a_size>::Identity() * 1e-6;
+    Lambdaprime_M += Eigen::Matrix<double, a_size, a_size>::Identity() * kInformationRegularization;
 
     // Update the estimate to send
     Eigen::Vector<double, a_size> tau                    = SpdSolver<a_size>(Lambdaprime_M).solve(eta_M);
