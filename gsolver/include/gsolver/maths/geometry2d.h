@@ -28,4 +28,14 @@ namespace gsolver {
     return x;
   }
 
+  //! angle wrapped to [-pi, pi]
+  inline double wrapAngle(const double& angle) {
+    return atan2(sin(angle), cos(angle));
+  }
+
+  //! v rotated by +90 degrees, i.e. d/dtheta (R(theta) v) at theta = 0
+  inline Eigen::Vector2d perp(const Eigen::Vector2d& v) {
+    return Eigen::Vector2d(-v.y(), v.x());
+  }
+
 } // namespace gsolver

@@ -21,6 +21,10 @@ set(GSOLVER_SOURCES
     src/graph/types/variables/se3_posevel.cpp
     
     # Factor types
+    src/graph/types/factors/se2_bearing.cpp
+    src/graph/types/factors/se2_odometry.cpp
+    src/graph/types/factors/se2_prior.cpp
+    src/graph/types/factors/se2_range_bearing.cpp
     src/graph/types/factors/se3_point_equality.cpp
     src/graph/types/factors/se3_posevel_gp.cpp
     src/graph/types/factors/se3_posevel_point.cpp
