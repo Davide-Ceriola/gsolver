@@ -1,5 +1,7 @@
 #pragma once
 
+#include <gsolver/graph/types/variables/se2_point.h>
+#include <gsolver/graph/types/variables/se2_pose.h>
 #include <gsolver/graph/types/variables/se3_point.h>
 #include <gsolver/graph/types/variables/se3_pose.h>
 #include <gsolver/graph/types/variables/se3_posevel.h>

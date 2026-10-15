@@ -14,6 +14,8 @@ set(GSOLVER_SOURCES
     # definitions and are #included by instantiations.cpp
     
     # Variable types
+    src/graph/types/variables/se2_point.cpp
+    src/graph/types/variables/se2_pose.cpp
     src/graph/types/variables/se3_point.cpp
     src/graph/types/variables/se3_pose.cpp
     src/graph/types/variables/se3_posevel.cpp

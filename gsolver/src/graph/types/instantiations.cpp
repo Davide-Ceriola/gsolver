@@ -34,6 +34,8 @@ namespace gsolver {
   template class VariableNode<12, SE3PoseVelValue, Edge<SE3PoseVel>>; // SE3PoseVel
   template class VariableNode<6, Eigen::Isometry3d, Edge<SE3Pose>>;   // SE3Pose
   template class VariableNode<3, Eigen::Vector3d, Edge<SE3Point>>;    // SE3Point
+  template class VariableNode<3, Eigen::Isometry2d, Edge<SE2Pose>>;   // SE2Pose
+  template class VariableNode<2, Eigen::Vector2d, Edge<SE2Point>>;    // SE2Point
 
   // =============================================================================
   // FactorNode Instantiations
@@ -51,6 +53,8 @@ namespace gsolver {
   template void FactorGraph::addVariableNode<SE3PoseVel>(const std::shared_ptr<SE3PoseVel>&);
   template void FactorGraph::addVariableNode<SE3Pose>(const std::shared_ptr<SE3Pose>&);
   template void FactorGraph::addVariableNode<SE3Point>(const std::shared_ptr<SE3Point>&);
+  template void FactorGraph::addVariableNode<SE2Pose>(const std::shared_ptr<SE2Pose>&);
+  template void FactorGraph::addVariableNode<SE2Point>(const std::shared_ptr<SE2Point>&);
 
   // =============================================================================
   // FactorGraph::addFactorNode Instantiations
