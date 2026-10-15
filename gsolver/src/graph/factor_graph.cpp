@@ -1,3 +1,5 @@
+#include <algorithm>
+
 #include <gsolver/graph/factor_graph.h>
 #include <gsolver/graph/helpers/factor_graph_helper.h>
 
@@ -118,6 +120,67 @@ namespace gsolver {
       throw std::runtime_error("Boundary edge " + edge->factor_id_ + " - " + edge->variable_id_ + " already registered");
     }
     boundary_edges_.push_back(edge);
+  }
+
+  void FactorGraph::unregisterBoundaryEdge(const std::string& factor_id, const std::string& variable_id) {
+    const auto it = boundary_index_.find({factor_id, variable_id});
+    if (it == boundary_index_.end()) {
+      throw std::runtime_error("Boundary edge " + factor_id + " - " + variable_id + " is not registered");
+    }
+    boundary_edges_.erase(std::find(boundary_edges_.begin(), boundary_edges_.end(), it->second));
+    boundary_index_.erase(it);
+  }
+
+  void FactorGraph::removeFactorNode(const std::string& factor_id) {
+    const auto it = std::find_if(factor_nodes_.begin(), factor_nodes_.end(), [&](const auto& f) { return f->id_ == factor_id; });
+    if (it == factor_nodes_.end()) {
+      throw std::runtime_error("removeFactorNode: factor " + factor_id + " not found");
+    }
+    const std::shared_ptr<FactorNodeBase> factor = *it;
+    for (size_t i = 0; i < factor->numberOfEdges(); ++i) {
+      const std::shared_ptr<EdgeBase> edge = factor->getEdgeAt(i);
+      if (edge->side_ == EdgeSide::FACTOR_SIDE) {
+        unregisterBoundaryEdge(factor_id, edge->variable_id_);
+      } else if (std::shared_ptr<VariableNodeBase> variable = getVariableNode(edge->variable_id_)) {
+        variable->removeEdge(factor_id);
+      }
+    }
+    factor_nodes_.erase(it);
+  }
+
+  void FactorGraph::removeBoundaryEdge(const std::string& factor_id, const std::string& variable_id) {
+    const std::shared_ptr<EdgeBase> edge = getBoundaryEdge(factor_id, variable_id);
+    if (!edge) {
+      throw std::runtime_error("removeBoundaryEdge: no boundary edge " + factor_id + " - " + variable_id);
+    }
+    if (edge->side_ == EdgeSide::FACTOR_SIDE) {
+      removeFactorNode(factor_id);
+      return;
+    }
+    getVariableNode(variable_id)->removeEdge(factor_id);
+    unregisterBoundaryEdge(factor_id, variable_id);
+  }
+
+  void FactorGraph::removeVariableNode(const std::string& variable_id) {
+    const auto it = std::find_if(variable_nodes_.begin(), variable_nodes_.end(), [&](const auto& v) { return v->id_ == variable_id; });
+    if (it == variable_nodes_.end()) {
+      throw std::runtime_error("removeVariableNode: variable " + variable_id + " not found");
+    }
+    const std::shared_ptr<VariableNodeBase> variable = *it;
+    // Collect first: removing factors edits the variable's edge list
+    std::vector<std::shared_ptr<EdgeBase>> edges;
+    for (size_t i = 0; i < variable->numberOfEdges(); ++i) {
+      edges.push_back(variable->getEdgeAt(i));
+    }
+    for (const auto& edge : edges) {
+      if (edge->side_ == EdgeSide::VARIABLE_SIDE) {
+        variable->removeEdge(edge->factor_id_);
+        unregisterBoundaryEdge(edge->factor_id_, variable_id);
+      } else {
+        removeFactorNode(edge->factor_id_);
+      }
+    }
+    variable_nodes_.erase(std::find(variable_nodes_.begin(), variable_nodes_.end(), variable));
   }
 
   // returns the pose variable nodes sorted by timestamp

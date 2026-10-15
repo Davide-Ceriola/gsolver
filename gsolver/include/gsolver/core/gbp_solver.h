@@ -12,6 +12,11 @@ namespace gsolver {
 
     SolverScheduleType schedule_type_;
 
+    // Run the per-node loops with OpenMP. Turn off for small graphs, or when the caller
+    // parallelizes across graphs (e.g. one thread per robot): a thread team per tiny loop
+    // costs more than the work.
+    bool parallel_ = true;
+
     void performIteration(FactorGraph& factor_graph);
 
     // The two halves of a synchronous iteration, exposed so that a caller can

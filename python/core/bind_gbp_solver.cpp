@@ -22,6 +22,7 @@ namespace gsolver {
       nb::class_<GbpSolver>(m, "GbpSolver", "Gaussian Belief Propagation Solver")
         .def(nb::init<SolverScheduleType>(), nb::arg("schedule_type"), "Create a GBP solver with the specified schedule type")
         .def_rw("schedule_type", &GbpSolver::schedule_type_, "Solver scheduling type")
+        .def_rw("parallel", &GbpSolver::parallel_, "Run the per-node loops with OpenMP")
         .def("perform_iteration",
              &GbpSolver::performIteration,
              nb::arg("factor_graph"),

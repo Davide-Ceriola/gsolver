@@ -30,4 +30,9 @@ public:
   // Add an edge to a factor that lives in another graph (marked VARIABLE_SIDE). Its incoming
   // message starts with zero precision at the current mean, until a payload is received.
   virtual std::shared_ptr<gsolver::EdgeBase> addDanglingEdge(const std::string& factor_id, int remote_id) = 0;
+
+  virtual size_t numberOfEdges() const                          = 0;
+  virtual std::shared_ptr<gsolver::EdgeBase> getEdgeAt(size_t i) = 0;
+  // Remove the edge to factor_id; throws if there is none
+  virtual void removeEdge(const std::string& factor_id) = 0;
 };

@@ -103,8 +103,17 @@ namespace gsolver {
   }
 
   template <int Dim_, typename EstimateType_, typename EdgeType_>
+  void VariableNode<Dim_, EstimateType_, EdgeType_>::removeEdge(const std::string& factor_id) {
+    const auto it = std::find_if(edges_.begin(), edges_.end(), [&](const auto& edge) { return edge->factor_id_ == factor_id; });
+    if (it == edges_.end()) {
+      throw std::runtime_error("VariableNode::removeEdge: " + id_ + " has no edge to " + factor_id);
+    }
+    edges_.erase(it);
+  }
+
+  template <int Dim_, typename EstimateType_, typename EdgeType_>
   void VariableNode<Dim_, EstimateType_, EdgeType_>::sendAllMessages() {
-#pragma omp parallel for
+    // Serial: this already runs inside the solver's loop over variables
     for (size_t i = 0; i < edges_.size(); ++i) {
       sendMessage(i);
     }

@@ -33,6 +33,14 @@ namespace gsolver {
     void updateMuAndSigma() override;
     std::shared_ptr<EdgeBase> addDanglingEdge(const std::string& factor_id, int remote_id) override;
 
+    size_t numberOfEdges() const override {
+      return edges_.size();
+    }
+    std::shared_ptr<EdgeBase> getEdgeAt(size_t i) override {
+      return edges_.at(i);
+    }
+    void removeEdge(const std::string& factor_id) override;
+
     // For each new VariableNode, implement the following functions:
     virtual const VectorLieDim boxminus(const EstimateType& mu_inward) = 0;
     virtual const EstimateType boxplus(const VectorLieDim& tau)        = 0;

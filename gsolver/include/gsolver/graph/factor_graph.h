@@ -68,8 +68,23 @@ namespace gsolver {
     // The boundary edge between factor_id and variable_id, or nullptr
     std::shared_ptr<EdgeBase> getBoundaryEdge(const std::string& factor_id, const std::string& variable_id) const;
 
+    // -------------------------------------------------------------------------
+    // Removal. Call between iterations, never during one.
+    // -------------------------------------------------------------------------
+
+    // Remove a factor and its edges, including the local half of any boundary edge it holds
+    void removeFactorNode(const std::string& factor_id);
+
+    // Remove the local half of a boundary edge: a VARIABLE_SIDE edge is dropped from its
+    // variable; a FACTOR_SIDE edge takes its factor with it (a factor cannot lose a variable)
+    void removeBoundaryEdge(const std::string& factor_id, const std::string& variable_id);
+
+    // Remove a variable together with every factor connected to it and its boundary halves
+    void removeVariableNode(const std::string& variable_id);
+
   private:
     void registerBoundaryEdge(const std::shared_ptr<EdgeBase>& edge);
+    void unregisterBoundaryEdge(const std::string& factor_id, const std::string& variable_id);
 
     std::map<std::pair<std::string, std::string>, std::shared_ptr<EdgeBase>> boundary_index_; // (factor, variable)
   };

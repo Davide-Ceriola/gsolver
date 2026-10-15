@@ -7,12 +7,12 @@ namespace gsolver {
 
   void GbpSolver::factorPhase(FactorGraph& factor_graph) {
 // Update factors
-#pragma omp parallel for
+#pragma omp parallel for if (parallel_)
     for (auto& factor_node : factor_graph.factor_nodes_) {
       factor_node->updateFactor();
     }
 // Factor-to-variable messages
-#pragma omp parallel for
+#pragma omp parallel for if (parallel_)
     for (auto& factor_node : factor_graph.factor_nodes_) {
       factor_node->sendAllMessages();
     }
@@ -20,12 +20,12 @@ namespace gsolver {
 
   void GbpSolver::variablePhase(FactorGraph& factor_graph) {
 // Update variables
-#pragma omp parallel for
+#pragma omp parallel for if (parallel_)
     for (auto& variable_node : factor_graph.variable_nodes_) {
       variable_node->updateMuAndSigma();
     }
 // Variable-to-factor messages
-#pragma omp parallel for
+#pragma omp parallel for if (parallel_)
     for (auto& variable_node : factor_graph.variable_nodes_) {
       variable_node->sendAllMessages();
     }

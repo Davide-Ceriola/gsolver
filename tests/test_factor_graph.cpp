@@ -79,3 +79,113 @@ TEST(GbpSolver, PhasesMatchPerformIteration) {
   EXPECT_EQ(whole.b->mu_, phased.b->mu_);
   EXPECT_EQ(whole.a->Sigma_, phased.a->Sigma_);
 }
+
+// ---------------------------------------------------------------------------
+// Removal
+// ---------------------------------------------------------------------------
+
+namespace {
+
+  const Eigen::Matrix3d kSigma2d = Eigen::Vector3d(0.01, 0.01, 0.001).asDiagonal();
+
+  Isometry2d pose2d(double x, double y, double theta) {
+    return expMapSE2(Eigen::Vector3d(x, y, theta));
+  }
+
+  // prior - P0 - ODOM_0 - P1 - ODOM_1 - P2, plus a bearing from P2 to a remote pose (factor side)
+  // and a dangling edge on P0 from a remote factor (variable side)
+  struct SmallGraph {
+    FactorGraph graph;
+    std::vector<std::shared_ptr<SE2Pose>> poses;
+
+    SmallGraph() {
+      graph.initial_guess_is_prior_ = false;
+      for (int k = 0; k < 3; ++k) {
+        poses.push_back(std::make_shared<SE2Pose>("P" + std::to_string(k), pose2d(k, 0, 0), Eigen::Matrix3d::Identity()));
+        graph.addVariableNode(poses.back());
+      }
+      graph.addFactorNode(std::make_shared<SE2Prior>("PRIOR", pose2d(0, 0, 0), kSigma2d), poses[0]);
+      graph.addFactorNode(std::make_shared<SE2Odometry>("ODOM_0", pose2d(1, 0, 0), kSigma2d), poses[0], poses[1]);
+      graph.addFactorNode(std::make_shared<SE2Odometry>("ODOM_1", pose2d(1, 0, 0), kSigma2d), poses[1], poses[2]);
+      auto remote = std::make_shared<SE2Pose>("REMOTE", pose2d(2, 3, 0), Eigen::Matrix3d::Identity());
+      graph.addFactorNode(std::make_shared<SE2Bearing>("OBS", M_PI / 2, SE2Bearing::MatrixErrorDim::Constant(1e-4)), poses[2], remote);
+      graph.markFactorSideBoundary("OBS", "REMOTE", 1);
+      graph.addVariableSideBoundary("P0", "REMOTE_OBS", 1);
+    }
+  };
+
+} // namespace
+
+TEST(FactorGraphRemoval, RemoveFactorDetachesItFromItsVariables) {
+  SmallGraph g;
+  g.graph.removeFactorNode("ODOM_0");
+  EXPECT_EQ(g.graph.factor_nodes_.size(), 3u);
+  EXPECT_EQ(g.graph.getFactorNode("ODOM_0"), nullptr);
+  EXPECT_EQ(g.poses[0]->edges_.size(), 2u); // PRIOR + dangling
+  EXPECT_EQ(g.poses[1]->edges_.size(), 1u); // ODOM_1
+  EXPECT_THROW(g.graph.removeFactorNode("ODOM_0"), std::runtime_error);
+}
+
+TEST(FactorGraphRemoval, RemovingAFactorSideBoundaryRemovesItsFactor) {
+  SmallGraph g;
+  g.graph.removeBoundaryEdge("OBS", "REMOTE");
+  EXPECT_EQ(g.graph.getFactorNode("OBS"), nullptr);
+  EXPECT_EQ(g.graph.getBoundaryEdge("OBS", "REMOTE"), nullptr);
+  EXPECT_EQ(g.poses[2]->edges_.size(), 1u); // ODOM_1
+  EXPECT_EQ(g.graph.boundary_edges_.size(), 1u);
+}
+
+TEST(FactorGraphRemoval, RemovingAVariableSideBoundaryDropsTheEdge) {
+  SmallGraph g;
+  g.graph.removeBoundaryEdge("REMOTE_OBS", "P0");
+  EXPECT_EQ(g.graph.getBoundaryEdge("REMOTE_OBS", "P0"), nullptr);
+  EXPECT_EQ(g.poses[0]->edges_.size(), 2u); // PRIOR + ODOM_0
+  EXPECT_EQ(g.graph.factor_nodes_.size(), 4u);
+  EXPECT_THROW(g.graph.removeBoundaryEdge("REMOTE_OBS", "P0"), std::runtime_error);
+}
+
+TEST(FactorGraphRemoval, RemoveVariableTakesItsFactorsAndBoundaryHalves) {
+  SmallGraph g;
+  g.graph.removeVariableNode("P0");
+  EXPECT_EQ(g.graph.getVariableNode("P0"), nullptr);
+  EXPECT_EQ(g.graph.getFactorNode("PRIOR"), nullptr);
+  EXPECT_EQ(g.graph.getFactorNode("ODOM_0"), nullptr);
+  EXPECT_EQ(g.graph.getBoundaryEdge("REMOTE_OBS", "P0"), nullptr);
+  EXPECT_EQ(g.poses[1]->edges_.size(), 1u);
+  EXPECT_EQ(g.graph.boundary_edges_.size(), 1u); // OBS on P2 remains
+
+  g.graph.removeVariableNode("P2");
+  EXPECT_EQ(g.graph.getFactorNode("OBS"), nullptr);
+  EXPECT_TRUE(g.graph.boundary_edges_.empty());
+  EXPECT_EQ(g.graph.variable_nodes_.size(), 1u);
+  EXPECT_TRUE(g.poses[1]->edges_.empty());
+}
+
+TEST(FactorGraphRemoval, SolverRunsAfterRemoval) {
+  SmallGraph g;
+  GbpSolver solver(SolverScheduleType::SYNCHRONOUS);
+  for (int i = 0; i < 5; ++i) {
+    solver.performIteration(g.graph);
+  }
+  g.graph.removeVariableNode("P0");
+  g.graph.addFactorNode(std::make_shared<SE2Prior>("PRIOR_1", g.poses[1]->mu_, kSigma2d), g.poses[1]);
+  for (int i = 0; i < 20; ++i) {
+    solver.performIteration(g.graph);
+  }
+  EXPECT_TRUE(g.poses[2]->mu_.translation().allFinite());
+  EXPECT_NEAR(g.poses[2]->mu_.translation().x(), 2.0, 1e-3);
+}
+
+TEST(GbpSolver, SerialAndParallelGiveIdenticalResults) {
+  SmallGraph parallel, serial;
+  GbpSolver parallel_solver(SolverScheduleType::SYNCHRONOUS), serial_solver(SolverScheduleType::SYNCHRONOUS);
+  serial_solver.parallel_ = false;
+  for (int i = 0; i < 20; ++i) {
+    parallel_solver.performIteration(parallel.graph);
+    serial_solver.performIteration(serial.graph);
+  }
+  for (int k = 0; k < 3; ++k) {
+    EXPECT_TRUE(parallel.poses[k]->mu_.isApprox(serial.poses[k]->mu_, 0.0));
+    EXPECT_EQ(parallel.poses[k]->Sigma_, serial.poses[k]->Sigma_);
+  }
+}
