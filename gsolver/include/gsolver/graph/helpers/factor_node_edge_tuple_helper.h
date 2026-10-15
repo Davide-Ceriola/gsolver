@@ -55,7 +55,10 @@ namespace gsolver {
     // Set the edge at index i in the tuple
     void setEdgeAt(size_t i, std::shared_ptr<EdgeBase> edge) {
       if (i == 0) {
-        current_edge_ = std::reinterpret_pointer_cast<Edge<CurrentVariableType>>(edge);
+        current_edge_ = std::dynamic_pointer_cast<Edge<CurrentVariableType>>(edge);
+        if (!current_edge_) {
+          throw std::runtime_error("Edge is of the wrong type for this factor slot");
+        }
         return;
       }
       RestFactorEdgeTuple::setEdgeAt(i - 1, edge);
@@ -141,7 +144,10 @@ namespace gsolver {
     // Set the edge at index i in the tuple
     void setEdgeAt(size_t i, std::shared_ptr<EdgeBase> edge) {
       if (i == 0) {
-        current_edge_ = std::reinterpret_pointer_cast<Edge<CurrentVariableType>>(edge);
+        current_edge_ = std::dynamic_pointer_cast<Edge<CurrentVariableType>>(edge);
+        if (!current_edge_) {
+          throw std::runtime_error("Edge is of the wrong type for this factor slot");
+        }
         return;
       }
       throw std::runtime_error("index out of bounds");

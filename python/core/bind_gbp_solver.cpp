@@ -26,6 +26,14 @@ namespace gsolver {
              &GbpSolver::performIteration,
              nb::arg("factor_graph"),
              "Perform a single iteration of belief propagation")
+        .def("factor_phase",
+             &GbpSolver::factorPhase,
+             nb::arg("factor_graph"),
+             "First half of a synchronous iteration: update factors and send factor-to-variable messages")
+        .def("variable_phase",
+             &GbpSolver::variablePhase,
+             nb::arg("factor_graph"),
+             "Second half of a synchronous iteration: update beliefs and send variable-to-factor messages")
         .def("perform_attention_iteration",
              &GbpSolver::performAttentionIteration,
              nb::arg("factor_graph"),

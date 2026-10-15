@@ -23,9 +23,9 @@ namespace gsolver {
       if (recoursion_depth == i) {
         // Check if the variable node is of the correct type and cast it
         std::shared_ptr<CurrentVariableType> variable_node =
-          std::reinterpret_pointer_cast<CurrentVariableType>(variable_node_base);
+          std::dynamic_pointer_cast<CurrentVariableType>(variable_node_base);
         if (!variable_node) {
-          throw std::runtime_error("Variable node type mismatch");
+          throw std::runtime_error("Variable node not found or of the wrong type for this factor");
         }
 
         // Create a new edge between the factor node and the variable node
@@ -61,9 +61,9 @@ namespace gsolver {
       if (recoursion_depth == i) {
         // Check if the variable node is of the correct type and cast it
         std::shared_ptr<CurrentVariableType> variable_node =
-          std::reinterpret_pointer_cast<CurrentVariableType>(variable_node_base);
+          std::dynamic_pointer_cast<CurrentVariableType>(variable_node_base);
         if (!variable_node) {
-          throw std::runtime_error("Variable node type mismatch");
+          throw std::runtime_error("Variable node not found or of the wrong type for this factor");
         }
 
         // Create a new edge between the factor node and the variable node

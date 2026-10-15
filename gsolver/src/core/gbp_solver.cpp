@@ -5,34 +5,36 @@ namespace gsolver {
   GbpSolver::GbpSolver(SolverScheduleType schedule_type) : schedule_type_(schedule_type) {
   }
 
+  void GbpSolver::factorPhase(FactorGraph& factor_graph) {
+// Update factors
+#pragma omp parallel for
+    for (auto& factor_node : factor_graph.factor_nodes_) {
+      factor_node->updateFactor();
+    }
+// Factor-to-variable messages
+#pragma omp parallel for
+    for (auto& factor_node : factor_graph.factor_nodes_) {
+      factor_node->sendAllMessages();
+    }
+  }
+
+  void GbpSolver::variablePhase(FactorGraph& factor_graph) {
+// Update variables
+#pragma omp parallel for
+    for (auto& variable_node : factor_graph.variable_nodes_) {
+      variable_node->updateMuAndSigma();
+    }
+// Variable-to-factor messages
+#pragma omp parallel for
+    for (auto& variable_node : factor_graph.variable_nodes_) {
+      variable_node->sendAllMessages();
+    }
+  }
+
   void GbpSolver::performIteration(FactorGraph& factor_graph) {
     if (schedule_type_ == SolverScheduleType::SYNCHRONOUS) {
-// Update factors
-// std::cout << "Update Factors" << std::endl;
-#pragma omp parallel for
-      for (auto& factor_node : factor_graph.factor_nodes_) {
-        factor_node->updateFactor();
-      }
-// Factor-to-variable messages
-// std::cout << "Factor Messages" << std::endl;
-#pragma omp parallel for
-      for (auto& factor_node : factor_graph.factor_nodes_) {
-        factor_node->sendAllMessages();
-      }
-
-// Update variables
-// std::cout << "Update Variables" << std::endl;s
-#pragma omp parallel for
-      for (auto& variable_node : factor_graph.variable_nodes_) {
-        variable_node->updateMuAndSigma();
-      }
-
-// Variable-to-factor messages
-// std::cout << "Variable Messages" << std::endl;
-#pragma omp parallel for
-      for (auto& variable_node : factor_graph.variable_nodes_) {
-        variable_node->sendAllMessages();
-      }
+      factorPhase(factor_graph);
+      variablePhase(factor_graph);
     } else if (schedule_type_ == SolverScheduleType::ASYNCHRONOUS) {
       // Implement asynchronous schedule (e.g., random node selection)
       // ...

@@ -6,6 +6,8 @@ class VariableNodeBase {
 public:
   std::string id_; // Variable node ID
 
+  virtual ~VariableNodeBase() = default;
+
   virtual void sendMessage(size_t outedge_id) = 0;
   virtual void sendMessage(const std::string& factor_id) = 0;
   virtual void sendAllMessages()              = 0;
