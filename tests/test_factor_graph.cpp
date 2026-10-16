@@ -189,3 +189,34 @@ TEST(GbpSolver, SerialAndParallelGiveIdenticalResults) {
     EXPECT_EQ(parallel.poses[k]->Sigma_, serial.poses[k]->Sigma_);
   }
 }
+
+TEST(FactorNode, DisabledFactorsContributeNothing) {
+  // P with a prior at 0 and a second prior at 1 m: disabling the second leaves the first alone
+  const Eigen::Matrix3d Sigma = Eigen::Vector3d(0.01, 0.01, 0.001).asDiagonal();
+  auto build = [&](FactorGraph& g, bool second) {
+    g.initial_guess_is_prior_ = false;
+    auto p                    = std::make_shared<SE2Pose>("P", pose2d(0.3, 0, 0), Eigen::Matrix3d::Identity() * 1e8);
+    g.addVariableNode(p);
+    g.addFactorNode(std::make_shared<SE2Prior>("A", pose2d(0, 0, 0), Sigma), p);
+    if (second) {
+      g.addFactorNode(std::make_shared<SE2Prior>("B", pose2d(1, 0, 0), Sigma), p);
+    }
+    return p;
+  };
+  FactorGraph with_disabled, without;
+  auto p = build(with_disabled, true), q = build(without, false);
+  with_disabled.getFactorNode("B")->enabled_ = false;
+  GbpSolver solver(SolverScheduleType::SYNCHRONOUS);
+  for (int i = 0; i < 20; ++i) {
+    solver.performIteration(with_disabled);
+    solver.performIteration(without);
+  }
+  EXPECT_LT((p->mu_.translation() - q->mu_.translation()).norm(), 1e-9);
+  EXPECT_LT((p->Sigma_ - q->Sigma_).norm() / q->Sigma_.norm(), 1e-6);
+
+  with_disabled.getFactorNode("B")->enabled_ = true; // and it counts again
+  for (int i = 0; i < 20; ++i) {
+    solver.performIteration(with_disabled);
+  }
+  EXPECT_NEAR(p->mu_.translation().x(), 0.5, 1e-6);
+}

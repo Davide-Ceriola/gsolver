@@ -24,7 +24,7 @@ namespace gsolver {
       const double squared = error_.dot(Omega * error_);
       robust_weight_       = robustWeight(robust_kernel_, std::sqrt(std::max(squared, 0.0)));
     }
-    const double k = robust_weight_;
+    const double k = enabled_ ? robust_weight_ : 0.0;
 
     // Update factor estimate (canonical form)
     eta_                       = J_.transpose() * Omega * (-error_) * k;

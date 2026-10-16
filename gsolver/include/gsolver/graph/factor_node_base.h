@@ -15,6 +15,10 @@ namespace gsolver {
     RobustKernelConfig robust_kernel_; // NONE by default
     double robust_weight_ = 1.0;       // weight applied at the last updateFactor (1 without a kernel)
 
+    // A disabled factor stays connected but contributes no information: its messages have zero
+    // precision. E.g. an observation waiting for a linearization point of a remote variable.
+    bool enabled_ = true;
+
     virtual ~FactorNodeBase() = default;
 
     virtual void setEdgeAt(size_t i, std::shared_ptr<EdgeBase> edge) = 0; // Set edge at index i

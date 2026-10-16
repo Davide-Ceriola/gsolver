@@ -29,6 +29,7 @@ namespace gsolver {
         .def_ro("id", &FactorNodeBase::id_, "Factor node ID")
         .def_rw("robust_kernel", &FactorNodeBase::robust_kernel_, "Robust kernel (NONE by default)")
         .def_ro("robust_weight", &FactorNodeBase::robust_weight_, "Weight applied at the last update")
+        .def_rw("enabled", &FactorNodeBase::enabled_, "A disabled factor contributes no information")
         .def(
           "set_edge_at",
           &FactorNodeBase::setEdgeAt,
