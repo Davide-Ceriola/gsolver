@@ -69,11 +69,10 @@ namespace gsolver {
       marginalize<a_size, b_size>(eta_C, Lambdaprime_C, eta_M, Lambdaprime_M);
     }
 
-    // ensure that the Lambdaprime_marg is invertible
-    Lambdaprime_M += Eigen::Matrix<double, a_size, a_size>::Identity() * kInformationRegularization;
-
-    // Update the estimate to send
-    Eigen::Vector<double, a_size> tau                    = SpdSolver<a_size>(Lambdaprime_M).solve(eta_M);
+    // Update the estimate to send; regularized only to solve, the message keeps the true precision
+    const Eigen::Matrix<double, a_size, a_size> Lambda_solve =
+      Lambdaprime_M + Eigen::Matrix<double, a_size, a_size>::Identity() * kInformationRegularization;
+    Eigen::Vector<double, a_size> tau                    = SpdSolver<a_size>(Lambda_solve).solve(eta_M);
     EstimateType mu_outward                              = VariableType::boxplus(mu_to_update, tau);
     Eigen::Matrix<double, a_size, a_size> Lambda_outward = Lambdaprime_M;
 

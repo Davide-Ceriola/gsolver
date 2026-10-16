@@ -53,10 +53,10 @@ namespace gsolver {
       tangent_eta += tangent_eta_inward;
       tangent_Lambdaprime += tangent_Lambda_inward;
     }
-    // Ensure that the tangent_Lambdaprime is invertible
-    tangent_Lambdaprime += MatrixLieDim::Identity() * kInformationRegularization; // keep it invertible
-    // get the perturbation to be applied to the current estimate
-    tangent_delta_mu = SpdSolver<Dim_>(tangent_Lambdaprime).solve(tangent_eta);
+    // get the perturbation to be applied to the current estimate; regularized only to solve,
+    // the message keeps the true precision
+    tangent_delta_mu = SpdSolver<Dim_>(MatrixLieDim(tangent_Lambdaprime + MatrixLieDim::Identity() * kInformationRegularization))
+                         .solve(tangent_eta);
 
     // compute the new estimate in the manifold
     EstimateType_ mu_outward         = boxplus(tangent_delta_mu);
@@ -136,9 +136,10 @@ namespace gsolver {
       total_Lambda += tangent_Lambda_in_[i];
     }
     for (size_t j = 0; j < k; ++j) {
-      MatrixLieDim Lambda = total_Lambda - tangent_Lambda_in_[j];
-      Lambda += MatrixLieDim::Identity() * kInformationRegularization; // keep it invertible
-      const VectorLieDim tau = SpdSolver<Dim_>(Lambda).solve(VectorLieDim(total_eta - tangent_eta_in_[j]));
+      const MatrixLieDim Lambda = total_Lambda - tangent_Lambda_in_[j];
+      // Regularized only to solve; the message keeps the true precision
+      const VectorLieDim tau = SpdSolver<Dim_>(MatrixLieDim(Lambda + MatrixLieDim::Identity() * kInformationRegularization))
+                                 .solve(VectorLieDim(total_eta - tangent_eta_in_[j]));
 
       edges_[j]->variable_to_factor_message_.Lambda_ = Lambda;
       edges_[j]->variable_to_factor_message_.mu_     = boxplus(tau);
@@ -172,9 +173,8 @@ namespace gsolver {
       tangent_eta += tangent_eta_inward;
       tangent_Lambdaprime += tangent_Lambda_inward;
     }
-    // Ensure that the tangent_Lambdaprime is invertible
-    tangent_Lambdaprime += MatrixLieDim::Identity() * kInformationRegularization; // keep it invertible
-    // get the perturbation to be applied to the current estimate
+    // Regularize to solve; the belief's covariance is that of the regularized precision
+    tangent_Lambdaprime += MatrixLieDim::Identity() * kInformationRegularization;
     const SpdSolver<Dim_> solver(tangent_Lambdaprime);
     tangent_delta_mu = solver.solve(tangent_eta);
 
