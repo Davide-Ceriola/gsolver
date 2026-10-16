@@ -15,7 +15,10 @@ namespace gsolver {
     void bind_factor_node_base(nb::module_& m) {
       nb::enum_<RobustKernel>(m, "RobustKernel", "Robust kernel applied to a factor")
         .value("NONE", RobustKernel::NONE)
-        .value("HUBER", RobustKernel::HUBER);
+        .value("HUBER", RobustKernel::HUBER)
+        .value("CAUCHY", RobustKernel::CAUCHY)
+        .value("GEMAN_MCCLURE", RobustKernel::GEMAN_MCCLURE)
+        .value("TUKEY", RobustKernel::TUKEY);
 
       nb::class_<RobustKernelConfig>(m, "RobustKernelConfig", "Kernel and threshold (Mahalanobis distance)")
         .def(nb::init<>())
