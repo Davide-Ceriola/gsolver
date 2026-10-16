@@ -114,8 +114,34 @@ namespace gsolver {
   template <int Dim_, typename EstimateType_, typename EdgeType_>
   void VariableNode<Dim_, EstimateType_, EdgeType_>::sendAllMessages() {
     // Serial: this already runs inside the solver's loop over variables
-    for (size_t i = 0; i < edges_.size(); ++i) {
-      sendMessage(i);
+    const size_t k = edges_.size();
+    if (k <= 1) {
+      for (size_t i = 0; i < k; ++i) {
+        sendMessage(i); // nothing to multiply; see sendMessage
+      }
+      return;
+    }
+
+    // Every incoming message in the tangent space at the current mean, once, and their sum.
+    // Each outgoing message is then the sum minus its own edge: O(k) instead of O(k^2).
+    tangent_eta_in_.resize(k);
+    tangent_Lambda_in_.resize(k);
+    VectorLieDim total_eta    = VectorLieDim::Zero();
+    MatrixLieDim total_Lambda = MatrixLieDim::Zero();
+    for (size_t i = 0; i < k; ++i) {
+      const auto& message   = edges_[i]->factor_to_variable_message_;
+      tangent_Lambda_in_[i] = message.Lambda_;
+      tangent_eta_in_[i]    = message.Lambda_ * boxminus(message.mu_);
+      total_eta += tangent_eta_in_[i];
+      total_Lambda += tangent_Lambda_in_[i];
+    }
+    for (size_t j = 0; j < k; ++j) {
+      MatrixLieDim Lambda = total_Lambda - tangent_Lambda_in_[j];
+      Lambda += MatrixLieDim::Identity() * kInformationRegularization; // keep it invertible
+      const VectorLieDim tau = SpdSolver<Dim_>(Lambda).solve(VectorLieDim(total_eta - tangent_eta_in_[j]));
+
+      edges_[j]->variable_to_factor_message_.Lambda_ = Lambda;
+      edges_[j]->variable_to_factor_message_.mu_     = boxplus(tau);
     }
   }
 

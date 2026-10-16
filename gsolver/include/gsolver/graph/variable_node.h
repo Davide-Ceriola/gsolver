@@ -41,6 +41,13 @@ namespace gsolver {
     }
     void removeEdge(const std::string& factor_id) override;
 
+  private:
+    // Scratch space for sendAllMessages, kept to avoid allocating every iteration
+    std::vector<VectorLieDim> tangent_eta_in_;
+    std::vector<MatrixLieDim> tangent_Lambda_in_;
+
+  public:
+
     // For each new VariableNode, implement the following functions:
     virtual const VectorLieDim boxminus(const EstimateType& mu_inward) = 0;
     virtual const EstimateType boxplus(const VectorLieDim& tau)        = 0;
