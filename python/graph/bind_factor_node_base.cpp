@@ -13,8 +13,19 @@ namespace gsolver {
   namespace python {
 
     void bind_factor_node_base(nb::module_& m) {
+      nb::enum_<RobustKernel>(m, "RobustKernel", "Robust kernel applied to a factor")
+        .value("NONE", RobustKernel::NONE)
+        .value("HUBER", RobustKernel::HUBER);
+
+      nb::class_<RobustKernelConfig>(m, "RobustKernelConfig", "Kernel and threshold (Mahalanobis distance)")
+        .def(nb::init<>())
+        .def_rw("kernel", &RobustKernelConfig::kernel)
+        .def_rw("threshold", &RobustKernelConfig::threshold);
+
       nb::class_<FactorNodeBase>(m, "FactorNodeBase", "Base class for factor nodes")
         .def_ro("id", &FactorNodeBase::id_, "Factor node ID")
+        .def_rw("robust_kernel", &FactorNodeBase::robust_kernel_, "Robust kernel (NONE by default)")
+        .def_ro("robust_weight", &FactorNodeBase::robust_weight_, "Weight applied at the last update")
         .def(
           "set_edge_at",
           &FactorNodeBase::setEdgeAt,

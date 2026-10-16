@@ -16,11 +16,17 @@ namespace gsolver {
   void FactorNode<Dim_, VariableTypes_...>::updateFactor() {
     // Update the error and Jacobian
     updateErrorAndJacobian();
-    // Compute the k factor for robust estimation
-    // double k = kRHuber(sqrt(error_.transpose() * Sigma_.inverse() * error_));
-    double k = 1;
-    // Update factor estimate (canonical form)
     const MatrixErrorDim Omega = Sigma_.inverse();
+
+    // Robust kernel: scale the factor's information by a weight from its Mahalanobis distance
+    robust_weight_ = 1.0;
+    if (robust_kernel_.kernel != RobustKernel::NONE) {
+      const double squared = error_.dot(Omega * error_);
+      robust_weight_       = robustWeight(robust_kernel_, std::sqrt(std::max(squared, 0.0)));
+    }
+    const double k = robust_weight_;
+
+    // Update factor estimate (canonical form)
     eta_                       = J_.transpose() * Omega * (-error_) * k;
     Lambdaprime_               = J_.transpose() * Omega * J_ * k;
     symmetrize(Lambdaprime_);

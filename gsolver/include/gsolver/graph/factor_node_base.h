@@ -3,6 +3,7 @@
 #include <memory>
 #include <string>
 
+#include <gsolver/core/robust_kernels.h>
 #include <gsolver/graph/edge_base.h>
 
 namespace gsolver {
@@ -10,6 +11,9 @@ namespace gsolver {
   class FactorNodeBase {
   public:
     std::string id_; // Factor node ID
+
+    RobustKernelConfig robust_kernel_; // NONE by default
+    double robust_weight_ = 1.0;       // weight applied at the last updateFactor (1 without a kernel)
 
     virtual ~FactorNodeBase() = default;
 
