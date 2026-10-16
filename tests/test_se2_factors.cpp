@@ -198,3 +198,40 @@ TEST(SE2Prior, ErrorWrapsAcrossPi) {
   SE2Prior::evaluate(se2(0, 0, M_PI - 0.01), se2(0, 0, -M_PI + 0.01), e, J);
   EXPECT_NEAR(e(2), -0.02, 1e-9);
 }
+
+// ---------------------------------------------------------------------------
+// Landmark factors
+// ---------------------------------------------------------------------------
+
+TEST(SE2Landmark, JacobiansMatchFiniteDifferences) {
+  std::mt19937 rng(6);
+  std::uniform_real_distribution<double> angle(-M_PI, M_PI), range(0.5, 20.0);
+  for (int trial = 0; trial < kTrials; ++trial) {
+    const auto [x, other]           = separatedPair(rng);
+    const Eigen::Vector2d landmark = other.translation();
+    const double bearing           = angle(rng);
+    const Eigen::Vector2d rb(range(rng), angle(rng));
+
+    SE2LandmarkBearing::VectorErrorDim eb;
+    SE2LandmarkBearing::MatrixJacobianDim Jb;
+    SE2LandmarkBearing::evaluate(x, landmark, bearing, eb, Jb);
+    auto bearing_of = [&](const std::vector<Isometry2d>& xs) -> Eigen::VectorXd {
+      SE2LandmarkBearing::VectorErrorDim e;
+      SE2LandmarkBearing::MatrixJacobianDim J;
+      SE2LandmarkBearing::evaluate(xs[0], landmark, bearing, e, J);
+      return e;
+    };
+    ASSERT_LT((Jb - numericJacobian(bearing_of, {x}, {0})).norm(), kTolerance) << "trial " << trial;
+
+    SE2LandmarkRangeBearing::VectorErrorDim erb;
+    SE2LandmarkRangeBearing::MatrixJacobianDim Jrb;
+    SE2LandmarkRangeBearing::evaluate(x, landmark, rb, erb, Jrb);
+    auto rb_of = [&](const std::vector<Isometry2d>& xs) -> Eigen::VectorXd {
+      SE2LandmarkRangeBearing::VectorErrorDim e;
+      SE2LandmarkRangeBearing::MatrixJacobianDim J;
+      SE2LandmarkRangeBearing::evaluate(xs[0], landmark, rb, e, J);
+      return e;
+    };
+    ASSERT_LT((Jrb - numericJacobian(rb_of, {x}, {1})).norm(), kTolerance) << "trial " << trial;
+  }
+}

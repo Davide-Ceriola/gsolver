@@ -50,6 +50,8 @@ namespace gsolver {
   template class FactorNode<3, SE2Pose, SE2Pose>;       // SE2Odometry
   template class FactorNode<1, SE2Pose, SE2Pose>;       // SE2Bearing
   template class FactorNode<2, SE2Pose, SE2Pose>;       // SE2RangeBearing
+  template class FactorNode<1, SE2Pose>;                // SE2LandmarkBearing
+  template class FactorNode<2, SE2Pose>;                // SE2LandmarkRangeBearing
 
   // =============================================================================
   // FactorGraph::addVariableNode Instantiations

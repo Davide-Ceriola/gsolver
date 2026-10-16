@@ -7,6 +7,7 @@
 #include <gsolver/graph/types/variables/se3_posevel.h>
 
 #include <gsolver/graph/types/factors/se2_bearing.h>
+#include <gsolver/graph/types/factors/se2_landmark.h>
 #include <gsolver/graph/types/factors/se2_odometry.h>
 #include <gsolver/graph/types/factors/se2_prior.h>
 #include <gsolver/graph/types/factors/se2_range_bearing.h>

@@ -299,3 +299,24 @@ TEST(SE2Gbp, RangeBearingTeamConvergesToGroundTruth) {
   }
   EXPECT_LT(maxPoseError(team.poses, team.truth), 1e-4);
 }
+
+TEST(SE2Gbp, LandmarkBearingsLocalizeAPoseWithoutAPrior) {
+  // Bearings to three known landmarks fix a pose completely (position and heading)
+  const Isometry2d truth = se2(1.0, -2.0, 0.7);
+  FactorGraph g;
+  g.initial_guess_is_prior_ = false;
+  auto pose                 = std::make_shared<SE2Pose>("P", se2(1.5, -1.5, 0.5), kWeakInitialSigma);
+  g.addVariableNode(pose);
+  int k = 0;
+  for (const Eigen::Vector2d landmark : {Eigen::Vector2d(10, 0), Eigen::Vector2d(-6, 8), Eigen::Vector2d(-6, -8)}) {
+    const Eigen::Vector2d p = truth.linear().transpose() * (landmark - truth.translation());
+    g.addFactorNode(std::make_shared<SE2LandmarkBearing>("L" + std::to_string(k++), landmark, atan2(p.y(), p.x()),
+                                                         SE2LandmarkBearing::MatrixErrorDim::Constant(1e-4)),
+                    pose);
+  }
+  GbpSolver solver(SolverScheduleType::SYNCHRONOUS);
+  for (int i = 0; i < 100; ++i) {
+    solver.performIteration(g);
+  }
+  EXPECT_LT(se2Error(truth, pose->mu_).norm(), 1e-6);
+}

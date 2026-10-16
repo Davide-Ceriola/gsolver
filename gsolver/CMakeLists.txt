@@ -22,6 +22,7 @@ set(GSOLVER_SOURCES
     
     # Factor types
     src/graph/types/factors/se2_bearing.cpp
+    src/graph/types/factors/se2_landmark.cpp
     src/graph/types/factors/se2_odometry.cpp
     src/graph/types/factors/se2_prior.cpp
     src/graph/types/factors/se2_range_bearing.cpp
