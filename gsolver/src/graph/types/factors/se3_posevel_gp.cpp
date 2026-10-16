@@ -9,12 +9,12 @@ namespace gsolver {
 
   void SE3PoseVelGP::updateErrorAndJacobian() {
     // Get the variables from the edges
-    std::shared_ptr<Edge<SE3PoseVel>> edge_from = edges_.at<0>();
-    std::shared_ptr<Edge<SE3PoseVel>> edge_to   = edges_.at<1>();
-    Message<SE3PoseVel> message_from            = edge_from->variable_to_factor_message_;
-    Message<SE3PoseVel> message_to              = edge_to->variable_to_factor_message_;
-    SE3PoseVel::EstimateType x_from             = message_from.mu_;
-    SE3PoseVel::EstimateType x_to               = message_to.mu_;
+    const std::shared_ptr<Edge<SE3PoseVel>>& edge_from = edges_.at<0>();
+    const std::shared_ptr<Edge<SE3PoseVel>>& edge_to   = edges_.at<1>();
+    const Message<SE3PoseVel>& message_from            = edge_from->variable_to_factor_message_;
+    const Message<SE3PoseVel>& message_to              = edge_to->variable_to_factor_message_;
+    const SE3PoseVel::EstimateType& x_from             = message_from.mu_;
+    const SE3PoseVel::EstimateType& x_to               = message_to.mu_;
     const Eigen::Isometry3d& x_from_pose        = x_from.pose;
     const Eigen::Isometry3d& x_to_pose          = x_to.pose;
     const Eigen::Vector<double, 6>& x_from_vel  = x_from.vel;

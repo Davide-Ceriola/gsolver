@@ -32,10 +32,10 @@ namespace gsolver {
 
   // compute the message from the factor node to the variable node
   template <typename VariableType, int a_offset, int a_size, int b_size>
-  static Message<VariableType> computeMessage(Eigen::Vector<double, a_size + b_size>& factor_eta,
-                                              Eigen::Matrix<double, a_size + b_size, a_size + b_size>& factor_Lambdaprime,
-                                              Eigen::Matrix<double, a_size + b_size, a_size + b_size>& conditioned_Lambdaprime,
-                                              typename VariableType::EstimateType& mu_to_update) {
+  static Message<VariableType> computeMessage(const Eigen::Vector<double, a_size + b_size>& factor_eta,
+                                              const Eigen::Matrix<double, a_size + b_size, a_size + b_size>& factor_Lambdaprime,
+                                              const Eigen::Matrix<double, a_size + b_size, a_size + b_size>& conditioned_Lambdaprime,
+                                              const typename VariableType::EstimateType& mu_to_update) {
     // Define the types
     using EstimateType          = typename VariableType::EstimateType;
     static const int total_size = a_size + b_size; // Total size of the joint distribution

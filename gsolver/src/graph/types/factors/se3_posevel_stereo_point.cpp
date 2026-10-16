@@ -10,8 +10,8 @@ namespace gsolver {
     : FactorNode(id, Sigma), z_(z), P_(P), baseline_(baseline) {}
 
   void SE3PoseVelStereoPoint::updateErrorAndJacobian() {
-    std::shared_ptr<Edge<SE3PoseVel>> edge_pose  = edges_.at<0>();
-    std::shared_ptr<Edge<SE3Point>>  edge_point  = edges_.at<1>();
+    const std::shared_ptr<Edge<SE3PoseVel>>& edge_pose  = edges_.at<0>();
+    const std::shared_ptr<Edge<SE3Point>>&  edge_point  = edges_.at<1>();
     const SE3PoseVel::EstimateType& x_posevel    = edge_pose->variable_to_factor_message_.mu_;
     const SE3Point::EstimateType&   x_point      = edge_point->variable_to_factor_message_.mu_;
 

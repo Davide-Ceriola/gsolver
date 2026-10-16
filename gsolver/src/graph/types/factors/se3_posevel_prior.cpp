@@ -8,9 +8,9 @@ namespace gsolver {
 
   void SE3PoseVelPrior::updateErrorAndJacobian() {
     // Get the variables from the edges
-    std::shared_ptr<Edge<SE3PoseVel>> edge_from = edges_.at<0>();
-    Message<SE3PoseVel> message_from            = edge_from->variable_to_factor_message_;
-    SE3PoseVel::EstimateType x_prior            = message_from.mu_;
+    const std::shared_ptr<Edge<SE3PoseVel>>& edge_from = edges_.at<0>();
+    const Message<SE3PoseVel>& message_from            = edge_from->variable_to_factor_message_;
+    const SE3PoseVel::EstimateType& x_prior            = message_from.mu_;
     const Eigen::Isometry3d& x                  = x_prior.pose;
 
     // Compute the error

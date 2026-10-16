@@ -5,8 +5,8 @@ namespace gsolver {
   SE3PointEquality::SE3PointEquality(std::string id, MatrixErrorDim Sigma) : FactorNode(id, Sigma) {}
 
   void SE3PointEquality::updateErrorAndJacobian() {
-    std::shared_ptr<Edge<SE3Point>> edge_0 = edges_.at<0>();
-    std::shared_ptr<Edge<SE3Point>> edge_1 = edges_.at<1>();
+    const std::shared_ptr<Edge<SE3Point>>& edge_0 = edges_.at<0>();
+    const std::shared_ptr<Edge<SE3Point>>& edge_1 = edges_.at<1>();
     const SE3Point::EstimateType& x0       = edge_0->variable_to_factor_message_.mu_;
     const SE3Point::EstimateType& x1       = edge_1->variable_to_factor_message_.mu_;
 

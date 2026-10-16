@@ -75,10 +75,10 @@ namespace gsolver {
 
     // Send message from factor node to variable node
     template <int VariablesDim_, int out_offset_ = 0>
-    void sendMessage(std::string variable_id,
-                     Eigen::Vector<double, VariablesDim_> factor_eta,
-                     Eigen::Matrix<double, VariablesDim_, VariablesDim_> factor_Lambdaprime,
-                     Eigen::Matrix<double, VariablesDim_, VariablesDim_> conditioned_Lambdaprime) {
+    void sendMessage(const std::string& variable_id,
+                     const Eigen::Vector<double, VariablesDim_>& factor_eta,
+                     const Eigen::Matrix<double, VariablesDim_, VariablesDim_>& factor_Lambdaprime,
+                     const Eigen::Matrix<double, VariablesDim_, VariablesDim_>& conditioned_Lambdaprime) {
       if (current_edge_->variable_id_ == variable_id) {
         static const int total_size = VariablesDim_;               // Total size of the joint distribution
         static const int a_size     = CurrentVariableType::LieDim; // Size of the outgoing edge
@@ -95,9 +95,9 @@ namespace gsolver {
 
     // Send messages from factor node to all the connected variable node
     template <int VariablesDim_, int out_offset_ = 0>
-    void sendAllMessages(Eigen::Vector<double, VariablesDim_> factor_eta,
-                         Eigen::Matrix<double, VariablesDim_, VariablesDim_> factor_Lambdaprime,
-                         Eigen::Matrix<double, VariablesDim_, VariablesDim_> conditioned_Lambdaprime) {
+    void sendAllMessages(const Eigen::Vector<double, VariablesDim_>& factor_eta,
+                         const Eigen::Matrix<double, VariablesDim_, VariablesDim_>& factor_Lambdaprime,
+                         const Eigen::Matrix<double, VariablesDim_, VariablesDim_>& conditioned_Lambdaprime) {
       static const int total_size      = VariablesDim_;               // Total size of the joint distribution
       static const int a_size          = CurrentVariableType::LieDim; // Size of the outgoing edge
       static const int b_size          = total_size - a_size;         // Size of the remaining edges
@@ -164,10 +164,10 @@ namespace gsolver {
 
     // Send message from factor node to variable node
     template <int VariablesDim_, int out_offset_ = 0>
-    void sendMessage(std::string variable_id,
-                     Eigen::Vector<double, VariablesDim_> factor_eta,
-                     Eigen::Matrix<double, VariablesDim_, VariablesDim_> factor_Lambdaprime,
-                     Eigen::Matrix<double, VariablesDim_, VariablesDim_> conditioned_Lambdaprime) {
+    void sendMessage(const std::string& variable_id,
+                     const Eigen::Vector<double, VariablesDim_>& factor_eta,
+                     const Eigen::Matrix<double, VariablesDim_, VariablesDim_>& factor_Lambdaprime,
+                     const Eigen::Matrix<double, VariablesDim_, VariablesDim_>& conditioned_Lambdaprime) {
       if (current_edge_->variable_id_ == variable_id) {
         static const int total_size = VariablesDim_;               // Total size of the joint distribution
         static const int a_size     = CurrentVariableType::LieDim; // Size of the outgoing edge
@@ -182,9 +182,9 @@ namespace gsolver {
 
     // Send messages from factor node to all the connected variable node
     template <int VariablesDim_, int out_offset_ = 0>
-    void sendAllMessages(Eigen::Vector<double, VariablesDim_> factor_eta,
-                         Eigen::Matrix<double, VariablesDim_, VariablesDim_> factor_Lambdaprime,
-                         Eigen::Matrix<double, VariablesDim_, VariablesDim_> conditioned_Lambdaprime) {
+    void sendAllMessages(const Eigen::Vector<double, VariablesDim_>& factor_eta,
+                         const Eigen::Matrix<double, VariablesDim_, VariablesDim_>& factor_Lambdaprime,
+                         const Eigen::Matrix<double, VariablesDim_, VariablesDim_>& conditioned_Lambdaprime) {
       static const int total_size = VariablesDim_;               // Total size of the joint distribution
       static const int a_size     = CurrentVariableType::LieDim; // Size of the outgoing edge
       static const int b_size     = total_size - a_size;         // Size of the remaining edges
