@@ -10,7 +10,11 @@ namespace gsolver {
   }
 
   const VectorLieDim SE3Pose::boxminus(const EstimateType& mu_inward) {
-    VectorLieDim tau_outward = logMapSE3(mu_.inverse() * mu_inward);
+    return boxminus(mu_, mu_inward);
+  }
+
+  const VectorLieDim SE3Pose::boxminus(const EstimateType& mu, const EstimateType& mu_inward) {
+    VectorLieDim tau_outward = logMapSE3(mu.inverse() * mu_inward);
     return tau_outward;
   }
 

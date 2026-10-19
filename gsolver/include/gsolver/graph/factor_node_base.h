@@ -19,6 +19,12 @@ namespace gsolver {
     // precision. E.g. an observation waiting for a linearization point of a remote variable.
     bool enabled_ = true;
 
+    // Message damping in [0, 1): each new factor-to-variable message keeps this share of the
+    // previous one (information form, in the tangent space at the new mean). It slows how fast
+    // messages change, against oscillation in loopy graphs, without moving the fixed point.
+    // 0 = none.
+    double damping_ = 0.0;
+
     virtual ~FactorNodeBase() = default;
 
     virtual void setEdgeAt(size_t i, std::shared_ptr<EdgeBase> edge) = 0; // Set edge at index i

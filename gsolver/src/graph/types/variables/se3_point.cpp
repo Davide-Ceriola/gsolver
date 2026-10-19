@@ -11,7 +11,11 @@ namespace gsolver {
       : VariableNode(id, mu, Sigma) {}
 
   const VectorLieDim SE3Point::boxminus(const EstimateType& mu_inward) {
-    return mu_inward - mu_;
+    return boxminus(mu_, mu_inward);
+  }
+
+  const VectorLieDim SE3Point::boxminus(const EstimateType& mu, const EstimateType& mu_inward) {
+    return mu_inward - mu;
   }
 
   const EstimateType SE3Point::boxplus(const VectorLieDim& tau_inward) {

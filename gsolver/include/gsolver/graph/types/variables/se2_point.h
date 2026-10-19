@@ -11,6 +11,8 @@ namespace gsolver {
     SE2Point(const std::string& id, const EstimateType& mu, const MatrixLieDim& Sigma);
 
     const VectorLieDim boxminus(const EstimateType& mu_inward) override;
+    //! mu_inward relative to mu, in the tangent space at mu
+    static const VectorLieDim boxminus(const EstimateType& mu, const EstimateType& mu_inward);
 
     const EstimateType boxplus(const VectorLieDim& tau_inward) override;
 

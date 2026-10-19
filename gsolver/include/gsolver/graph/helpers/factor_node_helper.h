@@ -83,4 +83,24 @@ namespace gsolver {
     return message;
   }
 
+  // Store a new factor-to-variable message, keeping `damping` of the previous one: the precision
+  // is the weighted average of the two, the mean moves from the new one towards the old by
+  // `damping` of the way (along the tangent space at the new mean). Mixing means rather than
+  // information vectors keeps the step bounded: two near rank-deficient precisions whose
+  // directions differ slightly would turn a small old offset into a large step in
+  // information form. Undamped when damping is 0, when there is no previous message, and when
+  // the new message carries nothing (a disabled factor must send exactly zero precision).
+  template <typename VariableType>
+  static void storeDamped(Message<VariableType>& stored, const Message<VariableType>& fresh, double damping) {
+    using MatrixLieDim = typename Message<VariableType>::MatrixLieDim;
+    if (damping <= 0.0 || stored.Lambda_.isZero(0.0) || fresh.Lambda_.isZero(0.0)) {
+      stored = fresh;
+      return;
+    }
+    MatrixLieDim Lambda = (1.0 - damping) * fresh.Lambda_ + damping * stored.Lambda_;
+    symmetrize(Lambda);
+    stored.mu_     = VariableType::boxplus(fresh.mu_, damping * VariableType::boxminus(fresh.mu_, stored.mu_));
+    stored.Lambda_ = Lambda;
+  }
+
 } // namespace gsolver

@@ -20,6 +20,8 @@ namespace gsolver {
     SE3PoseVel(const std::string& id, const EstimateType& mu, const MatrixLieDim& Sigma, double timestamp);
 
     const VectorLieDim boxminus(const EstimateType& mu_inward) override;
+    //! mu_inward relative to mu, in the tangent space at mu
+    static const VectorLieDim boxminus(const EstimateType& mu, const EstimateType& mu_inward);
 
     const EstimateType boxplus(const VectorLieDim& tau) override;
 

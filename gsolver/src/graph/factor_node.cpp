@@ -39,13 +39,13 @@ namespace gsolver {
   template <int Dim_, typename... VariableTypes_>
   void FactorNode<Dim_, VariableTypes_...>::sendMessage(const std::string& variable_id) {
     // Send message from factor node to variable node
-    edges_.template sendMessage<VariablesDim_>(variable_id, eta_, Lambdaprime_, Lambdaprime_conditioned_);
+    edges_.template sendMessage<VariablesDim_>(variable_id, eta_, Lambdaprime_, Lambdaprime_conditioned_, damping_);
   }
 
   template <int Dim_, typename... VariableTypes_>
   void FactorNode<Dim_, VariableTypes_...>::sendAllMessages() {
     // iterate over all edges and send messages to all connected variable nodes
-    edges_.template sendAllMessages<VariablesDim_>(eta_, Lambdaprime_, Lambdaprime_conditioned_);
+    edges_.template sendAllMessages<VariablesDim_>(eta_, Lambdaprime_, Lambdaprime_conditioned_, damping_);
   }
 
 } // namespace gsolver

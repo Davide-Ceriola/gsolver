@@ -22,6 +22,9 @@ namespace gsolver {
     // Initialize the variable-to-factor message
     edge->variable_to_factor_message_.mu_     = variable_node->mu_;
     edge->variable_to_factor_message_.Lambda_ = variable_node->Sigma_.inverse();
+    // Nothing received from the factor yet
+    edge->factor_to_variable_message_.mu_     = variable_node->mu_;
+    edge->factor_to_variable_message_.Lambda_.setZero();
 
     // Add the edge to the factor node and variable node
     factor_node->setEdgeAt(i, edge);

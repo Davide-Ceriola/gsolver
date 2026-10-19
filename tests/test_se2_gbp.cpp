@@ -320,3 +320,21 @@ TEST(SE2Gbp, LandmarkBearingsLocalizeAPoseWithoutAPrior) {
   }
   EXPECT_LT(se2Error(truth, pose->mu_).norm(), 1e-6);
 }
+
+TEST(SE2Gbp, DampingKeepsTheFixedPoint) {
+  // Damped messages change more slowly (about 3x the undamped iterations here) but converge to
+  // the same estimates
+  for (const InterRobotModel model : {InterRobotModel::BEARING, InterRobotModel::RANGE_BEARING}) {
+    std::mt19937 rng(14);
+    Team team;
+    buildTeam(team, model, 4, 5, rng, false);
+    for (const auto& factor : team.graph.factor_nodes_) {
+      factor->damping_ = 0.5;
+    }
+    GbpSolver solver(SolverScheduleType::SYNCHRONOUS);
+    for (int i = 0; i < 1000; ++i) {
+      solver.performIteration(team.graph);
+    }
+    EXPECT_LT(maxPoseError(team.poses, team.truth), 1e-4);
+  }
+}
