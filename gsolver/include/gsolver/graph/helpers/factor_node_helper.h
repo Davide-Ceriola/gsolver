@@ -2,6 +2,7 @@
 
 #include <Eigen/Dense>
 
+#include <gsolver/graph/message_update.h>
 #include <gsolver/maths/symmetric.h>
 
 namespace gsolver {
@@ -83,21 +84,30 @@ namespace gsolver {
     return message;
   }
 
-  // Store a new factor-to-variable message, keeping `damping` of the previous one: the precision
-  // is the weighted average of the two, the mean moves from the new one towards the old by
-  // `damping` of the way (along the tangent space at the new mean). Mixing means rather than
-  // information vectors keeps the step bounded: two near rank-deficient precisions whose
-  // directions differ slightly would turn a small old offset into a large step in
-  // information form. Undamped when damping is 0, when there is no previous message, and when
-  // the new message carries nothing (a disabled factor must send exactly zero precision).
+  // Store a new factor-to-variable message as the factor's MessageUpdate says. Dropout: the new
+  // message is skipped and the previous one stays. Damping: the precision is the weighted
+  // average of the two and the mean moves from the new one towards the old by the damping share
+  // (along the tangent space at the new mean). Mixing means rather than information vectors
+  // keeps the step bounded: two near rank-deficient precisions whose directions differ slightly
+  // would turn a small old offset into a large step in information form. Neither applies when
+  // there is no previous message, or when the new one carries nothing (a disabled factor must
+  // send exactly zero precision).
   template <typename VariableType>
-  static void storeDamped(Message<VariableType>& stored, const Message<VariableType>& fresh, double damping) {
+  static void storeMessage(Message<VariableType>& stored, const Message<VariableType>& fresh, MessageUpdate& update) {
     using MatrixLieDim = typename Message<VariableType>::MatrixLieDim;
-    if (damping <= 0.0 || stored.Lambda_.isZero(0.0) || fresh.Lambda_.isZero(0.0)) {
+    if (stored.Lambda_.isZero(0.0) || fresh.Lambda_.isZero(0.0)) {
       stored = fresh;
       return;
     }
-    MatrixLieDim Lambda = (1.0 - damping) * fresh.Lambda_ + damping * stored.Lambda_;
+    if (update.drop()) {
+      return;
+    }
+    if (update.damping <= 0.0) {
+      stored = fresh;
+      return;
+    }
+    const double damping = update.damping;
+    MatrixLieDim Lambda  = (1.0 - damping) * fresh.Lambda_ + damping * stored.Lambda_;
     symmetrize(Lambda);
     stored.mu_     = VariableType::boxplus(fresh.mu_, damping * VariableType::boxminus(fresh.mu_, stored.mu_));
     stored.Lambda_ = Lambda;

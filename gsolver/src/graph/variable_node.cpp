@@ -21,6 +21,10 @@ namespace gsolver {
     if (edges_.size() == 0) {
       return;
     }
+    message_update_.prepare(id_);
+    if (edges_.size() > 1 && message_update_.drop()) {
+      return; // dropped: the previous message stays
+    }
 
     // With a single factor there are no other factors to multiply: the message carries no
     // information. Legacy mode leaves the edge's initial message (the guess) in place instead.
@@ -135,7 +139,11 @@ namespace gsolver {
       total_eta += tangent_eta_in_[i];
       total_Lambda += tangent_Lambda_in_[i];
     }
+    message_update_.prepare(id_);
     for (size_t j = 0; j < k; ++j) {
+      if (message_update_.drop()) {
+        continue; // dropped: the previous message stays
+      }
       const MatrixLieDim Lambda = total_Lambda - tangent_Lambda_in_[j];
       // Regularized only to solve; the message keeps the true precision
       const VectorLieDim tau = SpdSolver<Dim_>(MatrixLieDim(Lambda + MatrixLieDim::Identity() * kInformationRegularization))

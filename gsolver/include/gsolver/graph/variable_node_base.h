@@ -4,6 +4,7 @@
 #include <string>
 
 #include <gsolver/graph/edge_base.h>
+#include <gsolver/graph/message_update.h>
 
 class VariableNodeBase {
 public:
@@ -19,6 +20,9 @@ public:
   // instead made gsolver's (mu, Lambda) messages numerically unstable on the stereo example.
   // FactorGraph::addVariableNode applies the graph's setting.
   bool initial_guess_is_prior_ = true;
+
+  // Dropout of its variable-to-factor messages (damping applies to factor messages only)
+  gsolver::MessageUpdate message_update_;
 
   virtual ~VariableNodeBase() = default;
 

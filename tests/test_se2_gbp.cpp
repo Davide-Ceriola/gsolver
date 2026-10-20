@@ -329,7 +329,28 @@ TEST(SE2Gbp, DampingKeepsTheFixedPoint) {
     Team team;
     buildTeam(team, model, 4, 5, rng, false);
     for (const auto& factor : team.graph.factor_nodes_) {
-      factor->damping_ = 0.5;
+      factor->message_update_.damping = 0.5;
+    }
+    GbpSolver solver(SolverScheduleType::SYNCHRONOUS);
+    for (int i = 0; i < 1000; ++i) {
+      solver.performIteration(team.graph);
+    }
+    EXPECT_LT(maxPoseError(team.poses, team.truth), 1e-4);
+  }
+}
+
+TEST(SE2Gbp, DropoutKeepsTheFixedPoint) {
+  // With 30% of the messages skipped at random (factor and variable messages alike) the team
+  // still converges to the truth, just more slowly
+  for (const InterRobotModel model : {InterRobotModel::BEARING, InterRobotModel::RANGE_BEARING}) {
+    std::mt19937 rng(15);
+    Team team;
+    buildTeam(team, model, 4, 5, rng, false);
+    for (const auto& factor : team.graph.factor_nodes_) {
+      factor->message_update_.dropout = 0.3;
+    }
+    for (const auto& variable : team.graph.variable_nodes_) {
+      variable->message_update_.dropout = 0.3;
     }
     GbpSolver solver(SolverScheduleType::SYNCHRONOUS);
     for (int i = 0; i < 1000; ++i) {

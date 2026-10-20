@@ -5,6 +5,7 @@
 
 #include <gsolver/core/robust_kernels.h>
 #include <gsolver/graph/edge_base.h>
+#include <gsolver/graph/message_update.h>
 
 namespace gsolver {
 
@@ -19,11 +20,8 @@ namespace gsolver {
     // precision. E.g. an observation waiting for a linearization point of a remote variable.
     bool enabled_ = true;
 
-    // Message damping in [0, 1): each new factor-to-variable message keeps this share of the
-    // previous one (information form, in the tangent space at the new mean). It slows how fast
-    // messages change, against oscillation in loopy graphs, without moving the fixed point.
-    // 0 = none.
-    double damping_ = 0.0;
+    // Damping and dropout of its factor-to-variable messages (none by default)
+    MessageUpdate message_update_;
 
     virtual ~FactorNodeBase() = default;
 
