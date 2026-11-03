@@ -67,9 +67,6 @@ target_link_libraries(gsolver
     PUBLIC
         Eigen3::Eigen
         OpenMP::OpenMP_CXX
-    PRIVATE
-        yaml-cpp
-        rerun_sdk
 )
 
 # -----------------------------------------------------------------------------

@@ -58,20 +58,8 @@ if(NOT eigen_POPULATED)
     add_subdirectory(${eigen_SOURCE_DIR} ${eigen_BINARY_DIR} EXCLUDE_FROM_ALL)
 endif()
 
-# --- Rerun SDK ---
-message(STATUS "Fetching Rerun SDK...")
-# Pinned: "latest" would change the build whenever Rerun releases. Keep in step with the
-# Python rerun-sdk (Dockerfile), so the viewer and the SDK match.
-FetchContent_Declare(
-    rerun_sdk
-    URL https://github.com/rerun-io/rerun/releases/download/0.39.0/rerun_cpp_sdk.zip
-    URL_HASH SHA256=fa1bee23b3669c5bafbae13132f8521db38e073a4593d1fb486e0d7d05425c8e
-)
-FetchContent_MakeAvailable(rerun_sdk)
-
 # --- System Dependencies ---
 find_package(OpenMP REQUIRED)
-find_package(yaml-cpp REQUIRED)
 
 # =============================================================================
 # Core Library
@@ -83,7 +71,20 @@ add_subdirectory(gsolver)
 # =============================================================================
 
 # --- Examples ---
+# Rerun and yaml-cpp are used by the examples only: the library itself needs Eigen and OpenMP,
+# so it builds on small machines (e.g. a Raspberry Pi on a robot) without them.
 if(GSOLVER_BUILD_EXAMPLES)
+    # --- Rerun SDK ---
+    message(STATUS "Fetching Rerun SDK...")
+    # Pinned: "latest" would change the build whenever Rerun releases. Keep in step with the
+    # Python rerun-sdk (Dockerfile), so the viewer and the SDK match.
+    FetchContent_Declare(
+        rerun_sdk
+        URL https://github.com/rerun-io/rerun/releases/download/0.39.0/rerun_cpp_sdk.zip
+        URL_HASH SHA256=fa1bee23b3669c5bafbae13132f8521db38e073a4593d1fb486e0d7d05425c8e
+    )
+    FetchContent_MakeAvailable(rerun_sdk)
+    find_package(yaml-cpp REQUIRED)
     add_subdirectory(examples)
 endif()
 
