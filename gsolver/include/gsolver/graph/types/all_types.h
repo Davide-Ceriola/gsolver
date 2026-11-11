@@ -12,6 +12,7 @@
 #include <gsolver/graph/types/factors/se2_prior.h>
 #include <gsolver/graph/types/factors/se2_range_bearing.h>
 #include <gsolver/graph/types/factors/se3_point_equality.h>
+#include <gsolver/graph/types/factors/se3_pose_pose.h>
 #include <gsolver/graph/types/factors/se3_posevel_gp.h>
 #include <gsolver/graph/types/factors/se3_posevel_point.h>
 #include <gsolver/graph/types/factors/se3_posevel_pose.h>

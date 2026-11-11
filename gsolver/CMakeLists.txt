@@ -33,6 +33,7 @@ set(GSOLVER_SOURCES
     src/graph/types/factors/se3_posevel_pose.cpp
     src/graph/types/factors/se3_posevel_posevel.cpp
     src/graph/types/factors/se3_posevel_prior.cpp
+    src/graph/types/factors/se3_pose_pose.cpp
     
     # Explicit template instantiations (must be last)
     src/graph/types/instantiations.cpp
