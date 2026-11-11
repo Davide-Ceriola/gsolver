@@ -69,6 +69,9 @@ namespace gsolver {
       edges_.setAllMessagesProcessed();
     }
     bool updateFactorIfNew() override;
+    double energy() const override {
+      return 0.5 * error_.dot(Sigma_.ldlt().solve(error_));
+    }
     size_t sendAllMessagesIfNew() override;
 
     // Update error and Jacobian of the factor

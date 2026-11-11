@@ -14,6 +14,7 @@ set(BINDING_SOURCES
     
     # Core module
     core/bind_gbp_solver.cpp
+    core/bind_rule_scheduler.cpp
     
     # Maths module
     maths/bind_geometry3d.cpp

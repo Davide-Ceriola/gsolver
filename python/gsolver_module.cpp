@@ -25,6 +25,7 @@ namespace gsolver::python {
   void bind_se3_posevel_pose(nb::module_& m);
   void bind_se3_posevel_point(nb::module_& m);
   void bind_pose_graph(nb::module_& m);
+  void bind_rule_scheduler(nb::module_& m);
 } // namespace gsolver::python
 
 NB_MODULE(_gsolver, m) {
@@ -70,6 +71,7 @@ NB_MODULE(_gsolver, m) {
   // Graph module - typed edges (require variable types to be registered)
   gsolver::python::bind_pose_graph(m); // SE2Pose must be registered before its edge type
   gsolver::python::bind_edge(m);
+  gsolver::python::bind_rule_scheduler(m);
 
   // Graph module - factor types
   gsolver::python::bind_se3_posevel_prior(m);

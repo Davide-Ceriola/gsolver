@@ -42,6 +42,10 @@ namespace gsolver {
     // If an incoming message is new: send to every variable, mark the incoming messages
     // processed, and return how many messages were stored (dropout can skip some). Else 0.
     virtual size_t sendAllMessagesIfNew() = 0;
+
+    // 0.5 e^T Sigma^-1 e at the last updateFactor, i.e. at the factor's incoming messages: the
+    // scalar a factor can attach to its replies (no robust kernel applied)
+    virtual double energy() const = 0;
   };
 
 } // namespace gsolver
