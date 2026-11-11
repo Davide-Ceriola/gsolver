@@ -31,6 +31,12 @@ public:
   virtual void sendAllMessages()              = 0;
   virtual void updateMuAndSigma()             = 0;
 
+  // Incremental message passing (see FactorNodeBase): whether an incoming factor-to-variable
+  // message has not been processed yet, and marking them all processed. Every message a
+  // variable writes on an edge is marked unprocessed for its factor.
+  virtual bool hasUnprocessedMessages() const = 0;
+  virtual void markMessagesProcessed()        = 0;
+
   // Add an edge to a factor that lives in another graph (marked VARIABLE_SIDE). Its incoming
   // message starts with zero precision at the current mean, until a payload is received.
   virtual std::shared_ptr<gsolver::EdgeBase> addDanglingEdge(const std::string& factor_id, int remote_id) = 0;

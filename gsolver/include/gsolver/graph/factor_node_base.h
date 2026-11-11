@@ -31,6 +31,17 @@ namespace gsolver {
     virtual void updateFactor()                                      = 0; // Update the factor based on the connected edges
     virtual void sendMessage(const std::string& variable_id)         = 0;
     virtual void sendAllMessages()                                   = 0;
+
+    // Incremental message passing, for schedulers that decide which variable-to-factor messages
+    // are sent (the solver's own loop does not use these). Every stored message starts
+    // unprocessed; a factor with no unprocessed incoming message has nothing new to compute.
+    virtual bool hasUnprocessedMessages() const = 0; // any incoming message not processed yet
+    virtual void markMessagesProcessed()        = 0; // mark every incoming message processed
+    // updateFactor() only if an incoming message is new; returns whether it ran
+    virtual bool updateFactorIfNew() = 0;
+    // If an incoming message is new: send to every variable, mark the incoming messages
+    // processed, and return how many messages were stored (dropout can skip some). Else 0.
+    virtual size_t sendAllMessagesIfNew() = 0;
   };
 
 } // namespace gsolver

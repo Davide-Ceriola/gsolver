@@ -97,23 +97,35 @@ namespace gsolver {
     }
 
     // Send messages from factor node to all the connected variable node
+    // Returns how many messages were stored (not dropped)
     template <int VariablesDim_, int out_offset_ = 0>
-    void sendAllMessages(const Eigen::Vector<double, VariablesDim_>& factor_eta,
-                         const Eigen::Matrix<double, VariablesDim_, VariablesDim_>& factor_Lambdaprime,
-                         const Eigen::Matrix<double, VariablesDim_, VariablesDim_>& conditioned_Lambdaprime,
-                     MessageUpdate& update) {
+    size_t sendAllMessages(const Eigen::Vector<double, VariablesDim_>& factor_eta,
+                           const Eigen::Matrix<double, VariablesDim_, VariablesDim_>& factor_Lambdaprime,
+                           const Eigen::Matrix<double, VariablesDim_, VariablesDim_>& conditioned_Lambdaprime,
+                           MessageUpdate& update) {
       static const int total_size      = VariablesDim_;               // Total size of the joint distribution
       static const int a_size          = CurrentVariableType::LieDim; // Size of the outgoing edge
       static const int b_size          = total_size - a_size;         // Size of the remaining edges
       static const int next_out_offset = out_offset_ + CurrentVariableType::LieDim;
       // Send the message to the variable node
-      storeMessage(current_edge_->factor_to_variable_message_,
-                  computeMessage<CurrentVariableType, out_offset_, a_size, b_size>(
-                    factor_eta, factor_Lambdaprime, conditioned_Lambdaprime, current_edge_->variable_to_factor_message_.mu_),
-                  update);
+      const size_t stored = storeMessage(current_edge_->factor_to_variable_message_,
+                                         computeMessage<CurrentVariableType, out_offset_, a_size, b_size>(
+                                           factor_eta, factor_Lambdaprime, conditioned_Lambdaprime, current_edge_->variable_to_factor_message_.mu_),
+                                         update);
       // Send messages to the rest of the variable nodes
-      RestFactorEdgeTuple::template sendAllMessages<VariablesDim_, next_out_offset>(
-        factor_eta, factor_Lambdaprime, conditioned_Lambdaprime, update);
+      return stored + RestFactorEdgeTuple::template sendAllMessages<VariablesDim_, next_out_offset>(
+                        factor_eta, factor_Lambdaprime, conditioned_Lambdaprime, update);
+    }
+
+    // Whether any incoming (variable-to-factor) message has not been processed yet
+    bool hasUnprocessedMessage() const {
+      return !current_edge_->variable_to_factor_message_.processed_ || RestFactorEdgeTuple::hasUnprocessedMessage();
+    }
+
+    // Mark every incoming (variable-to-factor) message as processed
+    void setAllMessagesProcessed() {
+      current_edge_->variable_to_factor_message_.processed_ = true;
+      RestFactorEdgeTuple::setAllMessagesProcessed();
     }
   };
 
@@ -191,19 +203,26 @@ namespace gsolver {
 
     // Send messages from factor node to all the connected variable node
     template <int VariablesDim_, int out_offset_ = 0>
-    void sendAllMessages(const Eigen::Vector<double, VariablesDim_>& factor_eta,
-                         const Eigen::Matrix<double, VariablesDim_, VariablesDim_>& factor_Lambdaprime,
-                         const Eigen::Matrix<double, VariablesDim_, VariablesDim_>& conditioned_Lambdaprime,
-                     MessageUpdate& update) {
+    size_t sendAllMessages(const Eigen::Vector<double, VariablesDim_>& factor_eta,
+                           const Eigen::Matrix<double, VariablesDim_, VariablesDim_>& factor_Lambdaprime,
+                           const Eigen::Matrix<double, VariablesDim_, VariablesDim_>& conditioned_Lambdaprime,
+                           MessageUpdate& update) {
       static const int total_size = VariablesDim_;               // Total size of the joint distribution
       static const int a_size     = CurrentVariableType::LieDim; // Size of the outgoing edge
       static const int b_size     = total_size - a_size;         // Size of the remaining edges
       // Send the message to the variable node
-      storeMessage(current_edge_->factor_to_variable_message_,
-                  computeMessage<CurrentVariableType, out_offset_, a_size, b_size>(
-                    factor_eta, factor_Lambdaprime, conditioned_Lambdaprime, current_edge_->variable_to_factor_message_.mu_),
-                  update);
-      return;
+      return storeMessage(current_edge_->factor_to_variable_message_,
+                          computeMessage<CurrentVariableType, out_offset_, a_size, b_size>(
+                            factor_eta, factor_Lambdaprime, conditioned_Lambdaprime, current_edge_->variable_to_factor_message_.mu_),
+                          update);
+    }
+
+    bool hasUnprocessedMessage() const {
+      return !current_edge_->variable_to_factor_message_.processed_;
+    }
+
+    void setAllMessagesProcessed() {
+      current_edge_->variable_to_factor_message_.processed_ = true;
     }
   };
 

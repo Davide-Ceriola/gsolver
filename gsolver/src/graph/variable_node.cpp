@@ -30,8 +30,9 @@ namespace gsolver {
     // information. Legacy mode leaves the edge's initial message (the guess) in place instead.
     if (edges_.size() == 1) {
       if (!initial_guess_is_prior_) {
-        edges_[outedge_id]->variable_to_factor_message_.Lambda_ = MatrixLieDim::Zero();
-        edges_[outedge_id]->variable_to_factor_message_.mu_     = mu_;
+        edges_[outedge_id]->variable_to_factor_message_.Lambda_    = MatrixLieDim::Zero();
+        edges_[outedge_id]->variable_to_factor_message_.mu_        = mu_;
+        edges_[outedge_id]->variable_to_factor_message_.processed_ = false;
       }
       return;
     }
@@ -66,8 +67,9 @@ namespace gsolver {
     EstimateType_ mu_outward         = boxplus(tangent_delta_mu);
     MatrixLieDim Lambdaprime_outward = tangent_Lambdaprime;
 
-    edges_[outedge_id]->variable_to_factor_message_.Lambda_ = Lambdaprime_outward;
-    edges_[outedge_id]->variable_to_factor_message_.mu_     = mu_outward;
+    edges_[outedge_id]->variable_to_factor_message_.Lambda_    = Lambdaprime_outward;
+    edges_[outedge_id]->variable_to_factor_message_.mu_        = mu_outward;
+    edges_[outedge_id]->variable_to_factor_message_.processed_ = false;
   }
 
   template <int Dim_, typename EstimateType_, typename EdgeType_>
@@ -149,8 +151,9 @@ namespace gsolver {
       const VectorLieDim tau = SpdSolver<Dim_>(MatrixLieDim(Lambda + MatrixLieDim::Identity() * kInformationRegularization))
                                  .solve(VectorLieDim(total_eta - tangent_eta_in_[j]));
 
-      edges_[j]->variable_to_factor_message_.Lambda_ = Lambda;
-      edges_[j]->variable_to_factor_message_.mu_     = boxplus(tau);
+      edges_[j]->variable_to_factor_message_.Lambda_    = Lambda;
+      edges_[j]->variable_to_factor_message_.mu_        = boxplus(tau);
+      edges_[j]->variable_to_factor_message_.processed_ = false;
     }
   }
 
@@ -190,6 +193,23 @@ namespace gsolver {
     mu_    = boxplus(tangent_delta_mu);
     Sigma_ = solver.solve(MatrixLieDim(MatrixLieDim::Identity()));
     symmetrize(Sigma_);
+  }
+
+  template <int Dim_, typename EstimateType_, typename EdgeType_>
+  bool VariableNode<Dim_, EstimateType_, EdgeType_>::hasUnprocessedMessages() const {
+    for (const auto& edge : edges_) {
+      if (!edge->factor_to_variable_message_.processed_) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  template <int Dim_, typename EstimateType_, typename EdgeType_>
+  void VariableNode<Dim_, EstimateType_, EdgeType_>::markMessagesProcessed() {
+    for (const auto& edge : edges_) {
+      edge->factor_to_variable_message_.processed_ = true;
+    }
   }
 
 } // namespace gsolver

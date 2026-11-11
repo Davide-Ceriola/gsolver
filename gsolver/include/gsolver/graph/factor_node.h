@@ -62,6 +62,15 @@ namespace gsolver {
     // Send messages to all connected variable nodes
     void sendAllMessages() override;
 
+    bool hasUnprocessedMessages() const override {
+      return edges_.hasUnprocessedMessage();
+    }
+    void markMessagesProcessed() override {
+      edges_.setAllMessagesProcessed();
+    }
+    bool updateFactorIfNew() override;
+    size_t sendAllMessagesIfNew() override;
+
     // Update error and Jacobian of the factor
     // This function should be implemented in the derived class
     virtual void updateErrorAndJacobian() = 0;

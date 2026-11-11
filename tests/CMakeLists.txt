@@ -23,6 +23,7 @@ add_executable(gsolver_tests
     test_robust_kernels.cpp
     test_se2_factors.cpp
     test_se2_gbp.cpp
+    test_incremental.cpp
 )
 target_link_libraries(gsolver_tests PRIVATE gsolver::gsolver GTest::gtest_main)
 # One OpenMP thread per test: the graphs are tiny, and ctest runs tests in

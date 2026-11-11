@@ -91,26 +91,29 @@ namespace gsolver {
   // keeps the step bounded: two near rank-deficient precisions whose directions differ slightly
   // would turn a small old offset into a large step in information form. Neither applies when
   // there is no previous message, or when the new one carries nothing (a disabled factor must
-  // send exactly zero precision).
+  // send exactly zero precision). Returns false when the message was dropped. A stored message
+  // is marked unprocessed (fresh messages are), for schedulers that track what is new.
   template <typename VariableType>
-  static void storeMessage(Message<VariableType>& stored, const Message<VariableType>& fresh, MessageUpdate& update) {
+  static bool storeMessage(Message<VariableType>& stored, const Message<VariableType>& fresh, MessageUpdate& update) {
     using MatrixLieDim = typename Message<VariableType>::MatrixLieDim;
     if (stored.Lambda_.isZero(0.0) || fresh.Lambda_.isZero(0.0)) {
       stored = fresh;
-      return;
+      return true;
     }
     if (update.drop()) {
-      return;
+      return false;
     }
     if (update.damping <= 0.0) {
       stored = fresh;
-      return;
+      return true;
     }
     const double damping = update.damping;
     MatrixLieDim Lambda  = (1.0 - damping) * fresh.Lambda_ + damping * stored.Lambda_;
     symmetrize(Lambda);
-    stored.mu_     = VariableType::boxplus(fresh.mu_, damping * VariableType::boxminus(fresh.mu_, stored.mu_));
-    stored.Lambda_ = Lambda;
+    stored.mu_        = VariableType::boxplus(fresh.mu_, damping * VariableType::boxminus(fresh.mu_, stored.mu_));
+    stored.Lambda_    = Lambda;
+    stored.processed_ = false;
+    return true;
   }
 
 } // namespace gsolver

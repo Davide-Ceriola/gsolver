@@ -31,6 +31,8 @@ namespace gsolver {
     void sendMessage(const std::string& factor_id) override;
     void sendAllMessages() override;
     void updateMuAndSigma() override;
+    bool hasUnprocessedMessages() const override;
+    void markMessagesProcessed() override;
     std::shared_ptr<EdgeBase> addDanglingEdge(const std::string& factor_id, int remote_id) override;
 
     size_t numberOfEdges() const override {

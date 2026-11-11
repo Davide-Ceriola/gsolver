@@ -50,4 +50,25 @@ namespace gsolver {
     edges_.template sendAllMessages<VariablesDim_>(eta_, Lambdaprime_, Lambdaprime_conditioned_, message_update_);
   }
 
+  template <int Dim_, typename... VariableTypes_>
+  bool FactorNode<Dim_, VariableTypes_...>::updateFactorIfNew() {
+    if (!edges_.hasUnprocessedMessage()) {
+      return false;
+    }
+    updateFactor();
+    return true;
+  }
+
+  template <int Dim_, typename... VariableTypes_>
+  size_t FactorNode<Dim_, VariableTypes_...>::sendAllMessagesIfNew() {
+    if (!edges_.hasUnprocessedMessage()) {
+      return 0;
+    }
+    message_update_.prepare(id_);
+    const size_t stored =
+      edges_.template sendAllMessages<VariablesDim_>(eta_, Lambdaprime_, Lambdaprime_conditioned_, message_update_);
+    edges_.setAllMessagesProcessed();
+    return stored;
+  }
+
 } // namespace gsolver
