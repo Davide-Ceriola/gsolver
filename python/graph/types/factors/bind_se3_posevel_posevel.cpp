@@ -10,13 +10,15 @@
 
 #include <gsolver/graph/types/factors/se3_posevel_posevel.h>
 
+#include "../../bind_accessors.h"
+
 namespace nb = nanobind;
 
 namespace gsolver {
   namespace python {
 
     void bind_se3_posevel_posevel(nb::module_& m) {
-      nb::class_<SE3PoseVelPoseVel, FactorNodeBase>(m, "SE3PoseVelPoseVel", "Relative pose factor between two SE3PoseVel nodes")
+      auto cls = nb::class_<SE3PoseVelPoseVel, FactorNodeBase>(m, "SE3PoseVelPoseVel", "Relative pose factor between two SE3PoseVel nodes")
         .def(
           "__init__",
           [](SE3PoseVelPoseVel* self,
@@ -56,6 +58,7 @@ namespace gsolver {
             f.z_         = iso;
           },
           "Relative pose measurement as 4x4 transformation matrix");
+      add_factor_accessors<SE3PoseVelPoseVel>(cls);
     }
 
   } // namespace python

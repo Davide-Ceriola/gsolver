@@ -21,6 +21,7 @@ namespace gsolver {
           "send_message",
           static_cast<void (VariableNodeBase::*)(size_t)>(&VariableNodeBase::sendMessage),
           nb::arg("edge_index"),
+          nb::call_guard<nb::gil_scoped_release>(),
           "Send a message along the specified outgoing edge (by index)")
         .def(
           "send_message_to_factor",
@@ -30,11 +31,20 @@ namespace gsolver {
         .def(
           "send_all_messages",
           &VariableNodeBase::sendAllMessages,
+          nb::call_guard<nb::gil_scoped_release>(),
           "Send messages along all connected edges")
         .def(
           "update_mu_sigma",
           &VariableNodeBase::updateMuAndSigma,
-          "Recompute the variable belief by fusing incoming messages");
+          nb::call_guard<nb::gil_scoped_release>(),
+          "Recompute the variable belief by fusing incoming messages")
+        .def("has_unprocessed_messages",
+             &VariableNodeBase::hasUnprocessedMessages,
+             "Whether an incoming factor-to-variable message has not been processed yet")
+        .def("mark_messages_processed",
+             &VariableNodeBase::markMessagesProcessed,
+             "Mark every incoming factor-to-variable message processed")
+        .def_prop_ro("num_edges", &VariableNodeBase::numberOfEdges, "Number of connected factors");
     }
 
   } // namespace python

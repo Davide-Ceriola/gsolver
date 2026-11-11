@@ -10,13 +10,15 @@
 
 #include <gsolver/graph/types/factors/se3_posevel_point.h>
 
+#include "../../bind_accessors.h"
+
 namespace nb = nanobind;
 
 namespace gsolver {
   namespace python {
 
     void bind_se3_posevel_point(nb::module_& m) {
-      nb::class_<SE3PoseVelPoint, FactorNodeBase>(m, "SE3PoseVelPoint", "Factor between SE3PoseVel and SE3Point")
+      auto cls = nb::class_<SE3PoseVelPoint, FactorNodeBase>(m, "SE3PoseVelPoint", "Factor between SE3PoseVel and SE3Point")
         .def(
           "__init__",
           [](SE3PoseVelPoint* self,
@@ -42,6 +44,7 @@ namespace gsolver {
           "    z: Point observation in robot frame\n"
           "    sigma: 3x3 measurement covariance")
         .def_rw("z", &SE3PoseVelPoint::z_, "Point measurement");
+      add_factor_accessors<SE3PoseVelPoint>(cls);
     }
 
   } // namespace python

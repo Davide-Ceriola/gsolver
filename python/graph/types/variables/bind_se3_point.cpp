@@ -10,13 +10,15 @@
 
 #include <gsolver/graph/types/variables/se3_point.h>
 
+#include "../../bind_accessors.h"
+
 namespace nb = nanobind;
 
 namespace gsolver {
   namespace python {
 
     void bind_se3_point(nb::module_& m) {
-      nb::class_<SE3Point, VariableNodeBase>(m, "SE3Point", "3D point variable node")
+      auto cls = nb::class_<SE3Point, VariableNodeBase>(m, "SE3Point", "3D point variable node")
         .def(
           "__init__",
           [](SE3Point* self,
@@ -45,6 +47,7 @@ namespace gsolver {
           "id", [](const SE3Point& self) { return std::string(self.id_); }, "Variable node ID")
         .def_rw("mu", &SE3Point::mu_, "Current point estimate")
         .def_rw("sigma", &SE3Point::Sigma_, "Covariance matrix");
+      add_variable_accessors<SE3Point>(cls);
     }
 
   } // namespace python

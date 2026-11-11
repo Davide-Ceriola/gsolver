@@ -10,6 +10,7 @@
 #include <gsolver/graph/types/variables/se3_point.h>
 #include <gsolver/graph/types/variables/se3_pose.h>
 #include <gsolver/graph/types/variables/se3_posevel.h>
+#include <gsolver/graph/types/variables/se2_pose.h>
 
 namespace nb = nanobind;
 
@@ -48,6 +49,19 @@ namespace gsolver {
         }
       };
 
+      // Eigen::Isometry2d as a 3x3 homogeneous matrix.
+      template <>
+      struct MessageEstimateAdapter<Eigen::Isometry2d> {
+        using PyType = Eigen::Matrix3d;
+        static PyType to_python(const Eigen::Isometry2d& value) {
+          return value.matrix();
+        }
+        static Eigen::Isometry2d from_python(const PyType& matrix) {
+          Eigen::Isometry2d iso;
+          iso.matrix() = matrix;
+          return iso;
+        }
+      };
     } // namespace detail
 
     template <typename VariableType>
@@ -96,6 +110,7 @@ namespace gsolver {
       bind_edge_type<SE3Point>(m, "EdgeSE3Point", "SE3PointMessage");
       bind_edge_type<SE3Pose>(m, "EdgeSE3Pose", "SE3PoseMessage");
       bind_edge_type<SE3PoseVel>(m, "EdgeSE3PoseVel", "SE3PoseVelMessage");
+      bind_edge_type<SE2Pose>(m, "EdgeSE2Pose", "SE2PoseMessage");
     }
 
   } // namespace python

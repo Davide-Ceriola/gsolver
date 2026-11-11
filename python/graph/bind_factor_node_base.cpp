@@ -39,16 +39,36 @@ namespace gsolver {
         .def(
           "update_factor",
           &FactorNodeBase::updateFactor,
+          nb::call_guard<nb::gil_scoped_release>(),
           "Recompute the factor's canonical parameters from the connected edges")
         .def(
           "send_message",
           &FactorNodeBase::sendMessage,
           nb::arg("variable_id"),
+          nb::call_guard<nb::gil_scoped_release>(),
           "Send a message toward the specified variable node")
         .def(
           "send_all_messages",
           &FactorNodeBase::sendAllMessages,
-          "Broadcast messages to every connected variable node");
+          nb::call_guard<nb::gil_scoped_release>(),
+          "Broadcast messages to every connected variable node")
+        // Incremental message passing for external schedulers (see FactorNodeBase)
+        .def("has_unprocessed_messages",
+             &FactorNodeBase::hasUnprocessedMessages,
+             "Whether an incoming variable-to-factor message has not been processed yet")
+        .def("mark_messages_processed",
+             &FactorNodeBase::markMessagesProcessed,
+             "Mark every incoming variable-to-factor message processed")
+        .def("update_factor_if_new",
+             &FactorNodeBase::updateFactorIfNew,
+             nb::call_guard<nb::gil_scoped_release>(),
+             "update_factor() only if an incoming message is new; returns whether it ran")
+        .def("send_all_messages_if_new",
+             &FactorNodeBase::sendAllMessagesIfNew,
+             nb::call_guard<nb::gil_scoped_release>(),
+             "If an incoming message is new: reply to every variable, mark the incoming messages processed, "
+             "return the number of messages stored. Else 0.")
+        .def_prop_ro("num_edges", &FactorNodeBase::numberOfEdges, "Number of connected variables");
     }
 
   } // namespace python

@@ -10,13 +10,15 @@
 
 #include <gsolver/graph/types/factors/se3_posevel_prior.h>
 
+#include "../../bind_accessors.h"
+
 namespace nb = nanobind;
 
 namespace gsolver {
   namespace python {
 
     void bind_se3_posevel_prior(nb::module_& m) {
-      nb::class_<SE3PoseVelPrior, FactorNodeBase>(m, "SE3PoseVelPrior", "Prior factor on SE3PoseVel")
+      auto cls = nb::class_<SE3PoseVelPrior, FactorNodeBase>(m, "SE3PoseVelPrior", "Prior factor on SE3PoseVel")
         .def(
           "__init__",
           [](SE3PoseVelPrior* self,
@@ -57,6 +59,7 @@ namespace gsolver {
             f.z_         = iso;
           },
           "Prior measurement as 4x4 transformation matrix");
+      add_factor_accessors<SE3PoseVelPrior>(cls);
     }
 
   } // namespace python

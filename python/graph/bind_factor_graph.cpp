@@ -15,6 +15,10 @@
 #include <gsolver/graph/types/variables/se3_point.h>
 #include <gsolver/graph/types/variables/se3_pose.h>
 #include <gsolver/graph/types/variables/se3_posevel.h>
+#include <gsolver/graph/types/factors/se2_odometry.h>
+#include <gsolver/graph/types/factors/se2_prior.h>
+#include <gsolver/graph/types/factors/se3_pose_pose.h>
+#include <gsolver/graph/types/variables/se2_pose.h>
 
 namespace nb = nanobind;
 
@@ -46,7 +50,44 @@ namespace gsolver {
           nb::arg("variable"),
           "Add an SE3Point variable to the graph")
 
+        .def(
+          "add_variable",
+          [](FactorGraph& fg, std::shared_ptr<SE2Pose> var) { fg.addVariableNode(var); },
+          nb::arg("variable"),
+          "Add an SE2Pose variable to the graph")
         // Add factor nodes
+        .def(
+          "add_factor",
+          [](FactorGraph& fg, std::shared_ptr<SE2Prior> factor, std::vector<std::string> var_ids) {
+            fg.addFactorNode(factor, var_ids);
+          },
+          nb::arg("factor"),
+          nb::arg("variable_ids"),
+          "Add a SE2Prior factor to the graph")
+        .def(
+          "add_factor",
+          [](FactorGraph& fg, std::shared_ptr<SE2Odometry> factor, std::vector<std::string> var_ids) {
+            fg.addFactorNode(factor, var_ids);
+          },
+          nb::arg("factor"),
+          nb::arg("variable_ids"),
+          "Add a SE2Odometry factor to the graph")
+        .def(
+          "add_factor",
+          [](FactorGraph& fg, std::shared_ptr<SE3PosePose> factor, std::vector<std::string> var_ids) {
+            fg.addFactorNode(factor, var_ids);
+          },
+          nb::arg("factor"),
+          nb::arg("variable_ids"),
+          "Add a SE3PosePose factor to the graph")
+        .def(
+          "add_factor",
+          [](FactorGraph& fg, std::shared_ptr<SE3PosePrior> factor, std::vector<std::string> var_ids) {
+            fg.addFactorNode(factor, var_ids);
+          },
+          nb::arg("factor"),
+          nb::arg("variable_ids"),
+          "Add a SE3PosePrior factor to the graph")
         .def(
           "add_factor",
           [](FactorGraph& fg, std::shared_ptr<SE3PoseVelPrior> factor, std::vector<std::string> var_ids) {

@@ -10,13 +10,15 @@
 
 #include <gsolver/graph/types/factors/se3_posevel_pose.h>
 
+#include "../../bind_accessors.h"
+
 namespace nb = nanobind;
 
 namespace gsolver {
   namespace python {
 
     void bind_se3_posevel_pose(nb::module_& m) {
-      nb::class_<SE3PoseVelPose, FactorNodeBase>(m, "SE3PoseVelPose", "Factor between SE3PoseVel and SE3Pose (landmark)")
+      auto cls = nb::class_<SE3PoseVelPose, FactorNodeBase>(m, "SE3PoseVelPose", "Factor between SE3PoseVel and SE3Pose (landmark)")
         .def(
           "__init__",
           [](SE3PoseVelPose* self,
@@ -56,6 +58,7 @@ namespace gsolver {
             f.z_         = iso;
           },
           "Measurement as 4x4 transformation matrix");
+      add_factor_accessors<SE3PoseVelPose>(cls);
     }
 
   } // namespace python

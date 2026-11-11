@@ -10,13 +10,15 @@
 
 #include <gsolver/graph/types/variables/se3_pose.h>
 
+#include "../../bind_accessors.h"
+
 namespace nb = nanobind;
 
 namespace gsolver {
   namespace python {
 
     void bind_se3_pose(nb::module_& m) {
-      nb::class_<SE3Pose, VariableNodeBase>(m, "SE3Pose", "SE3 pose variable node")
+      auto cls = nb::class_<SE3Pose, VariableNodeBase>(m, "SE3Pose", "SE3 pose variable node")
         .def(
           "__init__",
           [](SE3Pose* self,
@@ -58,6 +60,7 @@ namespace gsolver {
           },
           "Current pose estimate as 4x4 transformation matrix")
         .def_rw("sigma", &SE3Pose::Sigma_, "Covariance matrix");
+      add_variable_accessors<SE3Pose>(cls);
     }
 
   } // namespace python

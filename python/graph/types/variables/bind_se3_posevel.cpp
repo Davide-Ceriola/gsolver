@@ -10,6 +10,8 @@
 
 #include <gsolver/graph/types/variables/se3_posevel.h>
 
+#include "../../bind_accessors.h"
+
 namespace nb = nanobind;
 
 namespace gsolver {
@@ -36,7 +38,7 @@ namespace gsolver {
         });
 
       // SE3PoseVel variable node
-      nb::class_<SE3PoseVel, VariableNodeBase>(m, "SE3PoseVel", "SE3 pose with velocity variable node")
+      auto cls = nb::class_<SE3PoseVel, VariableNodeBase>(m, "SE3PoseVel", "SE3 pose with velocity variable node")
         .def(
           "__init__",
           [](SE3PoseVel* self,
@@ -66,6 +68,7 @@ namespace gsolver {
         .def_rw("mu", &SE3PoseVel::mu_, "Current estimate")
         .def_rw("sigma", &SE3PoseVel::Sigma_, "Covariance matrix")
         .def_rw("timestamp", &SE3PoseVel::timestamp_, "Timestamp");
+      add_variable_accessors<SE3PoseVel>(cls);
     }
 
   } // namespace python
