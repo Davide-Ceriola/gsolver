@@ -2,6 +2,7 @@
 
 #include <memory>
 #include <string>
+#include <vector>
 
 #include <gsolver/graph/edge_base.h>
 #include <gsolver/graph/message_update.h>
@@ -29,6 +30,14 @@ public:
   virtual void sendMessage(size_t outedge_id) = 0;
   virtual void sendMessage(const std::string& factor_id) = 0;
   virtual void sendAllMessages()              = 0;
+
+  // Send on the edges with mask[i] != 0 (a scheduler's decision); with send_belief_ the belief is
+  // computed once and sent on all of them
+  virtual void sendMessages(const std::vector<int>& mask) = 0;
+
+  // Send the belief instead of per-edge messages (one computation, same for every edge); factors
+  // recover the per-edge messages exactly. Off by default.
+  bool send_belief_ = false;
   virtual void updateMuAndSigma()             = 0;
 
   // Incremental message passing (see FactorNodeBase): whether an incoming factor-to-variable

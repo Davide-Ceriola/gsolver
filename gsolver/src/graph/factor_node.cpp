@@ -14,6 +14,8 @@ namespace gsolver {
 
   template <int Dim_, typename... VariableTypes_>
   void FactorNode<Dim_, VariableTypes_...>::updateFactor() {
+    // Beliefs sent by variables (send_belief_) -> the per-edge messages they stand for
+    edges_.convertBeliefMessages();
     // Update the error and Jacobian, at the incoming message means or (linearise_at_belief_) at
     // the linearisation points, moved to the beliefs when they have moved far enough
     if (linearise_at_belief_) {

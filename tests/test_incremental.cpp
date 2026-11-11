@@ -181,3 +181,45 @@ TEST(Incremental, DroppedRepliesAreNotCounted) {
     EXPECT_FALSE(f->hasUnprocessedMessages());
   }
 }
+
+TEST(BeliefMessages, EqualPerEdgeMessages) {
+  // A variable sending its belief, and each factor removing its own last message, must give the
+  // same GBP as per-edge variable messages, in both linearisation modes
+  for (bool at_belief : {false, true}) {
+    Loop a, b;
+    buildLoop(a, 8, 6);
+    buildLoop(b, 8, 6);
+    for (auto* l : {&a, &b}) {
+      for (auto& f : l->graph.factor_nodes_) {
+        f->linearise_at_belief_ = at_belief;
+      }
+    }
+    for (auto& v : b.graph.variable_nodes_) {
+      v->send_belief_ = true;
+    }
+    std::mt19937 rng(3);
+    std::bernoulli_distribution send(0.7);
+    for (int it = 0; it < 60; ++it) {
+      for (size_t i = 0; i < a.graph.variable_nodes_.size(); ++i) {
+        std::vector<int> mask(a.graph.variable_nodes_[i]->numberOfEdges());
+        for (auto& m : mask) {
+          m = send(rng);
+        }
+        a.graph.variable_nodes_[i]->sendMessages(mask);
+        b.graph.variable_nodes_[i]->sendMessages(mask);
+        a.graph.variable_nodes_[i]->markMessagesProcessed();
+        b.graph.variable_nodes_[i]->markMessagesProcessed();
+      }
+      for (auto* l : {&a, &b}) {
+        for (auto& f : l->graph.factor_nodes_) {
+          f->updateFactorIfNew();
+          f->sendAllMessagesIfNew();
+        }
+        for (auto& v : l->graph.variable_nodes_) {
+          v->updateMuAndSigma();
+        }
+      }
+      ASSERT_LT(maxDifference(a, b), 1e-9) << "linearise_at_belief " << at_belief << ", iteration " << it;
+    }
+  }
+}

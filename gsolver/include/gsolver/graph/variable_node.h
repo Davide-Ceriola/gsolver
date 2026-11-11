@@ -30,6 +30,7 @@ namespace gsolver {
     void sendMessage(size_t outedge_id) override;
     void sendMessage(const std::string& factor_id) override;
     void sendAllMessages() override;
+    void sendMessages(const std::vector<int>& mask) override;
     void updateMuAndSigma() override;
     bool hasUnprocessedMessages() const override;
     void markMessagesProcessed() override;
@@ -44,6 +45,18 @@ namespace gsolver {
     void removeEdge(const std::string& factor_id) override;
 
   private:
+    // The belief message (send_belief_): mean, total precision and information vector at the mean
+    template <typename MessageType>
+    void writeBelief(MessageType& message, const MatrixLieDim& Lambda, const VectorLieDim& eta) const {
+      message.mu_         = mu_;
+      message.Lambda_     = Lambda;
+      message.eta_        = eta;
+      message.is_belief_  = true;
+      message.processed_  = false;
+      message.belief_mu_  = mu_;
+      message.has_belief_ = true;
+    }
+    void beliefSums(MatrixLieDim& Lambda, VectorLieDim& eta);
     // Scratch space for sendAllMessages, kept to avoid allocating every iteration
     std::vector<VectorLieDim> tangent_eta_in_;
     std::vector<MatrixLieDim> tangent_Lambda_in_;

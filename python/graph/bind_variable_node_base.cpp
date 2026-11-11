@@ -3,6 +3,7 @@
 // =============================================================================
 #include <nanobind/nanobind.h>
 #include <nanobind/stl/string.h>
+#include <nanobind/stl/vector.h>
 
 #include <gsolver/graph/variable_node_base.h>
 
@@ -38,6 +39,10 @@ namespace gsolver {
           &VariableNodeBase::updateMuAndSigma,
           nb::call_guard<nb::gil_scoped_release>(),
           "Recompute the variable belief by fusing incoming messages")
+        .def_rw("send_belief", &VariableNodeBase::send_belief_,
+                "Send the belief instead of per-edge messages; factors recover the per-edge messages exactly")
+        .def("send_messages", &VariableNodeBase::sendMessages, nb::arg("mask"), nb::call_guard<nb::gil_scoped_release>(),
+             "Send on the edges with mask[i] != 0 (one belief computation with send_belief)")
         .def("has_unprocessed_messages",
              &VariableNodeBase::hasUnprocessedMessages,
              "Whether an incoming factor-to-variable message has not been processed yet")

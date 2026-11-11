@@ -219,12 +219,12 @@ namespace gsolver {
         const EstimateType before = v->mu_;
         for (size_t j = 0; j < masks[i].size(); ++j) {
           if (masks[i][j]) {
-            v->sendMessage(j);
             last_sent_tick_[i][j] = ticks_;
             last_sent_pose_[i][j] = before;
             ++counts.variable_to_factor;
           }
         }
+        v->sendMessages(masks[i]); // with send_belief_: one belief for all selected edges
         v->markMessagesProcessed();
       }
       for (auto& f : graph_.factor_nodes_) {

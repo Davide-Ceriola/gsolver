@@ -26,6 +26,17 @@ namespace gsolver {
       return; // dropped: the previous message stays
     }
 
+    if (send_belief_) {
+      if (edges_.size() == 1 && initial_guess_is_prior_) {
+        return; // legacy: the edge keeps its initial message, as below
+      }
+      MatrixLieDim Lambda;
+      VectorLieDim eta;
+      beliefSums(Lambda, eta);
+      writeBelief(edges_[outedge_id]->variable_to_factor_message_, Lambda, eta);
+      return;
+    }
+
     // With a single factor there are no other factors to multiply: the message carries no
     // information. Legacy mode leaves the edge's initial message (the guess) in place instead.
     if (edges_.size() == 1) {
@@ -125,6 +136,11 @@ namespace gsolver {
   void VariableNode<Dim_, EstimateType_, EdgeType_>::sendAllMessages() {
     // Serial: this already runs inside the solver's loop over variables
     const size_t k = edges_.size();
+    if (send_belief_) {
+      std::vector<int> all(k, 1);
+      sendMessages(all);
+      return;
+    }
     if (k <= 1) {
       for (size_t i = 0; i < k; ++i) {
         sendMessage(i); // nothing to multiply; see sendMessage
@@ -215,6 +231,46 @@ namespace gsolver {
   void VariableNode<Dim_, EstimateType_, EdgeType_>::markMessagesProcessed() {
     for (const auto& edge : edges_) {
       edge->factor_to_variable_message_.processed_ = true;
+    }
+  }
+
+  template <int Dim_, typename EstimateType_, typename EdgeType_>
+  void VariableNode<Dim_, EstimateType_, EdgeType_>::beliefSums(MatrixLieDim& Lambda, VectorLieDim& eta) {
+    Lambda.setZero();
+    eta.setZero();
+    for (const auto& edge : edges_) {
+      const auto& m = edge->factor_to_variable_message_;
+      Lambda += m.Lambda_;
+      eta += m.Lambda_ * boxminus(m.mu_);
+    }
+  }
+
+  template <int Dim_, typename EstimateType_, typename EdgeType_>
+  void VariableNode<Dim_, EstimateType_, EdgeType_>::sendMessages(const std::vector<int>& mask) {
+    if (!send_belief_) {
+      for (size_t i = 0; i < mask.size() && i < edges_.size(); ++i) {
+        if (mask[i]) {
+          sendMessage(i);
+        }
+      }
+      return;
+    }
+    if (edges_.empty() || (edges_.size() == 1 && initial_guess_is_prior_)) {
+      return;
+    }
+    // One belief for every selected edge (dropout still per edge, as in sendMessage)
+    MatrixLieDim Lambda;
+    VectorLieDim eta;
+    beliefSums(Lambda, eta);
+    message_update_.prepare(id_);
+    for (size_t i = 0; i < mask.size() && i < edges_.size(); ++i) {
+      if (!mask[i]) {
+        continue;
+      }
+      if (edges_.size() > 1 && message_update_.drop()) {
+        continue;
+      }
+      writeBelief(edges_[i]->variable_to_factor_message_, Lambda, eta);
     }
   }
 

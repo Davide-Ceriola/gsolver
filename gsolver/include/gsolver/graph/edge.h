@@ -2,6 +2,8 @@
 
 #include <stdexcept>
 
+#include <Eigen/Dense>
+
 #include <gsolver/graph/edge_base.h>
 
 namespace gsolver {
@@ -20,6 +22,14 @@ namespace gsolver {
     // linearise at the beliefs (FactorNodeBase::linearise_at_belief_); unused otherwise
     EstimateType belief_mu_;
     bool has_belief_ = false;
+
+    // Belief messages (VariableNodeBase::send_belief_): the variable sends its whole belief
+    // (mu_ = belief mean, Lambda_ = sum of all incoming precisions, eta_ = sum of all incoming
+    // information vectors in the tangent space at mu_) and the factor recovers what the variable
+    // would have sent it by removing its own last message (FactorNode: convertBeliefMessages)
+    Eigen::Matrix<double, MatrixLieDim::RowsAtCompileTime, 1> eta_ =
+      Eigen::Matrix<double, MatrixLieDim::RowsAtCompileTime, 1>::Zero();
+    bool is_belief_ = false;
   };
 
   template <typename VariableType>

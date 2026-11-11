@@ -174,6 +174,29 @@ namespace gsolver {
       return at_lin_point ? current_edge_->lin_point_ : current_edge_->variable_to_factor_message_.mu_;
     }
 
+
+    // Belief message -> the variable-to-factor message the variable would have sent: remove this
+    // factor's own last message from the belief (same computation as VariableNode::sendMessage)
+    void convertBeliefHere() {
+      auto& m = current_edge_->variable_to_factor_message_;
+      if (!m.is_belief_) {
+        return;
+      }
+      using V            = CurrentVariableType;
+      const auto& mine   = current_edge_->factor_to_variable_message_;
+      typename V::MatrixLieDim Lambda = m.Lambda_ - mine.Lambda_;
+      symmetrize(Lambda);
+      const typename V::VectorLieDim eta = m.eta_ - mine.Lambda_ * V::boxminus(m.mu_, mine.mu_);
+      const typename V::VectorLieDim tau =
+        SpdSolver<V::LieDim>(typename V::MatrixLieDim(Lambda + V::MatrixLieDim::Identity() * kInformationRegularization)).solve(eta);
+      m.mu_        = V::boxplus(m.mu_, tau);
+      m.Lambda_    = Lambda;
+      m.is_belief_ = false;
+    }
+    void convertBeliefMessages() {
+      convertBeliefHere();
+      RestFactorEdgeTuple::convertBeliefMessages();
+    }
     bool needsRelinearisation(double tolerance) const {
       return needsRelinearisationHere(tolerance) || RestFactorEdgeTuple::needsRelinearisation(tolerance);
     }
@@ -333,6 +356,28 @@ namespace gsolver {
       return at_lin_point ? current_edge_->lin_point_ : current_edge_->variable_to_factor_message_.mu_;
     }
 
+
+    // Belief message -> the variable-to-factor message the variable would have sent: remove this
+    // factor's own last message from the belief (same computation as VariableNode::sendMessage)
+    void convertBeliefHere() {
+      auto& m = current_edge_->variable_to_factor_message_;
+      if (!m.is_belief_) {
+        return;
+      }
+      using V            = CurrentVariableType;
+      const auto& mine   = current_edge_->factor_to_variable_message_;
+      typename V::MatrixLieDim Lambda = m.Lambda_ - mine.Lambda_;
+      symmetrize(Lambda);
+      const typename V::VectorLieDim eta = m.eta_ - mine.Lambda_ * V::boxminus(m.mu_, mine.mu_);
+      const typename V::VectorLieDim tau =
+        SpdSolver<V::LieDim>(typename V::MatrixLieDim(Lambda + V::MatrixLieDim::Identity() * kInformationRegularization)).solve(eta);
+      m.mu_        = V::boxplus(m.mu_, tau);
+      m.Lambda_    = Lambda;
+      m.is_belief_ = false;
+    }
+    void convertBeliefMessages() {
+      convertBeliefHere();
+    }
     bool needsRelinearisation(double tolerance) const {
       return needsRelinearisationHere(tolerance);
     }
