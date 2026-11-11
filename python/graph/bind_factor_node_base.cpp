@@ -30,6 +30,16 @@ namespace gsolver {
         .def_rw("robust_kernel", &FactorNodeBase::robust_kernel_, "Robust kernel (NONE by default)")
         .def_ro("robust_weight", &FactorNodeBase::robust_weight_, "Weight applied at the last update")
         .def_rw("enabled", &FactorNodeBase::enabled_, "A disabled factor contributes no information")
+        .def_prop_rw(
+          "damping",
+          [](const FactorNodeBase& f) { return f.message_update_.damping; },
+          [](FactorNodeBase& f, double d) { f.message_update_.damping = d; },
+          "Share of the previous factor-to-variable message each new one keeps (0: none)")
+        .def_prop_rw(
+          "dropout",
+          [](const FactorNodeBase& f) { return f.message_update_.dropout; },
+          [](FactorNodeBase& f, double d) { f.message_update_.dropout = d; },
+          "Chance that a new factor-to-variable message is not sent (0: none)")
         .def(
           "set_edge_at",
           &FactorNodeBase::setEdgeAt,
