@@ -33,6 +33,10 @@ namespace gsolver {
     // Conditioned estimate (used for message computation)
     MatrixVariablesDim Lambdaprime_conditioned_; // Lambda matrix conditioned on all the connected edges
 
+    // Incoming messages as information vectors at the linearisation points (linearise_at_belief_;
+    // zero otherwise)
+    VectorVariablesDim incoming_eta_ = VectorVariablesDim::Zero();
+
     // error and Jacobian of the factor
     VectorErrorDim error_; // Error of the factor
     MatrixErrorDim Sigma_; // Factor covariance matrix (represents uncertainty of the error)

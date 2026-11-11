@@ -33,6 +33,8 @@ namespace gsolver {
         edges_[outedge_id]->variable_to_factor_message_.Lambda_    = MatrixLieDim::Zero();
         edges_[outedge_id]->variable_to_factor_message_.mu_        = mu_;
         edges_[outedge_id]->variable_to_factor_message_.processed_ = false;
+        edges_[outedge_id]->variable_to_factor_message_.belief_mu_  = mu_;
+        edges_[outedge_id]->variable_to_factor_message_.has_belief_ = true;
       }
       return;
     }
@@ -70,6 +72,8 @@ namespace gsolver {
     edges_[outedge_id]->variable_to_factor_message_.Lambda_    = Lambdaprime_outward;
     edges_[outedge_id]->variable_to_factor_message_.mu_        = mu_outward;
     edges_[outedge_id]->variable_to_factor_message_.processed_ = false;
+    edges_[outedge_id]->variable_to_factor_message_.belief_mu_  = mu_;
+    edges_[outedge_id]->variable_to_factor_message_.has_belief_ = true;
   }
 
   template <int Dim_, typename EstimateType_, typename EdgeType_>
@@ -154,6 +158,8 @@ namespace gsolver {
       edges_[j]->variable_to_factor_message_.Lambda_    = Lambda;
       edges_[j]->variable_to_factor_message_.mu_        = boxplus(tau);
       edges_[j]->variable_to_factor_message_.processed_ = false;
+      edges_[j]->variable_to_factor_message_.belief_mu_  = mu_;
+      edges_[j]->variable_to_factor_message_.has_belief_ = true;
     }
   }
 

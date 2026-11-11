@@ -14,8 +14,18 @@ namespace gsolver {
 
   template <int Dim_, typename... VariableTypes_>
   void FactorNode<Dim_, VariableTypes_...>::updateFactor() {
-    // Update the error and Jacobian
-    updateErrorAndJacobian();
+    // Update the error and Jacobian, at the incoming message means or (linearise_at_belief_) at
+    // the linearisation points, moved to the beliefs when they have moved far enough
+    if (linearise_at_belief_) {
+      if (edges_.needsRelinearisation(relinearise_tolerance_)) {
+        edges_.setLinearisationPoints();
+      }
+      edges_.swapWithLinearisationPoints();
+      updateErrorAndJacobian();
+      edges_.swapWithLinearisationPoints();
+    } else {
+      updateErrorAndJacobian();
+    }
     const MatrixErrorDim Omega = Sigma_.inverse();
 
     // Robust kernel: scale the factor's information by a weight from its Mahalanobis distance
@@ -34,20 +44,27 @@ namespace gsolver {
     // Update Lambda by conditioning on the connected edges
     Lambdaprime_conditioned_ = Lambdaprime_;
     Lambdaprime_conditioned_ = edges_.template computeJointDistribution<VariablesDim_>(Lambdaprime_conditioned_);
+    if (linearise_at_belief_) {
+      edges_.template incomingEta<VariablesDim_>(incoming_eta_);
+    } else {
+      incoming_eta_.setZero();
+    }
   }
 
   template <int Dim_, typename... VariableTypes_>
   void FactorNode<Dim_, VariableTypes_...>::sendMessage(const std::string& variable_id) {
     // Send message from factor node to variable node
     message_update_.prepare(id_);
-    edges_.template sendMessage<VariablesDim_>(variable_id, eta_, Lambdaprime_, Lambdaprime_conditioned_, message_update_);
+    edges_.template sendMessage<VariablesDim_>(variable_id, eta_, Lambdaprime_, Lambdaprime_conditioned_, message_update_,
+                                               incoming_eta_, linearise_at_belief_);
   }
 
   template <int Dim_, typename... VariableTypes_>
   void FactorNode<Dim_, VariableTypes_...>::sendAllMessages() {
     // iterate over all edges and send messages to all connected variable nodes
     message_update_.prepare(id_);
-    edges_.template sendAllMessages<VariablesDim_>(eta_, Lambdaprime_, Lambdaprime_conditioned_, message_update_);
+    edges_.template sendAllMessages<VariablesDim_>(eta_, Lambdaprime_, Lambdaprime_conditioned_, message_update_,
+                                                   incoming_eta_, linearise_at_belief_);
   }
 
   template <int Dim_, typename... VariableTypes_>
@@ -66,7 +83,8 @@ namespace gsolver {
     }
     message_update_.prepare(id_);
     const size_t stored =
-      edges_.template sendAllMessages<VariablesDim_>(eta_, Lambdaprime_, Lambdaprime_conditioned_, message_update_);
+      edges_.template sendAllMessages<VariablesDim_>(eta_, Lambdaprime_, Lambdaprime_conditioned_, message_update_,
+                                                   incoming_eta_, linearise_at_belief_);
     edges_.setAllMessagesProcessed();
     return stored;
   }

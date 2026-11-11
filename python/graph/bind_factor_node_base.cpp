@@ -30,6 +30,11 @@ namespace gsolver {
         .def_rw("robust_kernel", &FactorNodeBase::robust_kernel_, "Robust kernel (NONE by default)")
         .def_ro("robust_weight", &FactorNodeBase::robust_weight_, "Weight applied at the last update")
         .def_rw("enabled", &FactorNodeBase::enabled_, "A disabled factor contributes no information")
+        .def_rw("linearise_at_belief", &FactorNodeBase::linearise_at_belief_,
+                "Linearise at the variables' beliefs (kept until they move by relinearise_tolerance) instead of "
+                "at the incoming message means (default False)")
+        .def_rw("relinearise_tolerance", &FactorNodeBase::relinearise_tolerance_,
+                "linearise_at_belief mode: relinearise when a belief moved more than this in the tangent space (0: any move)")
         .def_prop_rw(
           "damping",
           [](const FactorNodeBase& f) { return f.message_update_.damping; },

@@ -23,6 +23,14 @@ namespace gsolver {
     // Damping and dropout of its factor-to-variable messages (none by default)
     MessageUpdate message_update_;
 
+    // Where the factor linearises. false (default): at the means of its incoming
+    // variable-to-factor messages (each variable's cavity mean), re-evaluated at every update.
+    // true: at the variables' belief means, which the messages carry; the factor keeps that
+    // linearisation point until a belief moves by more than relinearise_tolerance_ (0: any move)
+    // and adds each incoming message as an information vector at that point.
+    bool linearise_at_belief_     = false;
+    double relinearise_tolerance_ = 0.0;
+
     virtual ~FactorNodeBase() = default;
 
     virtual void setEdgeAt(size_t i, std::shared_ptr<EdgeBase> edge) = 0; // Set edge at index i

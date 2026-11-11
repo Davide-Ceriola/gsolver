@@ -15,6 +15,11 @@ namespace gsolver {
     bool processed_ = false; // Flag indicating if the message has been processed
     MatrixLieDim Lambda_; // Lambda matrix (precision matrix of the factor)
     EstimateType mu_;     // Estimate of the variable
+
+    // Variable-to-factor messages also carry the sender's belief mean, used by factors that
+    // linearise at the beliefs (FactorNodeBase::linearise_at_belief_); unused otherwise
+    EstimateType belief_mu_;
+    bool has_belief_ = false;
   };
 
   template <typename VariableType>
@@ -28,6 +33,10 @@ namespace gsolver {
 
     MessageType variable_to_factor_message_;
     MessageType factor_to_variable_message_;
+
+    // The factor's linearisation point for this variable (linearise_at_belief_ mode only)
+    typename VariableType::EstimateType lin_point_;
+    bool has_lin_point_ = false;
 
     int payloadSize() const override {
       return PayloadSize;
