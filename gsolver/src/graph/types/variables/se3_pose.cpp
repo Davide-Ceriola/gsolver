@@ -1,3 +1,4 @@
+#include <gsolver/maths/lie_options.h>
 #include <gsolver/graph/types/variables/se3_pose.h>
 
 namespace gsolver {
@@ -14,17 +15,17 @@ namespace gsolver {
   }
 
   const VectorLieDim SE3Pose::boxminus(const EstimateType& mu, const EstimateType& mu_inward) {
-    VectorLieDim tau_outward = logMapSE3(mu.inverse() * mu_inward);
+    VectorLieDim tau_outward = chartLogSE3(mu.inverse() * mu_inward);
     return tau_outward;
   }
 
   const EstimateType SE3Pose::boxplus(const VectorLieDim& tau) {
-    EstimateType mu_outward = mu_ * expMapSE3(tau);
+    EstimateType mu_outward = mu_ * chartExpSE3(tau);
     return mu_outward;
   }
 
   const EstimateType SE3Pose::boxplus(const EstimateType& mu, const VectorLieDim& tau) {
-    EstimateType mu_outward = mu * expMapSE3(tau);
+    EstimateType mu_outward = mu * chartExpSE3(tau);
     return mu_outward;
   }
 

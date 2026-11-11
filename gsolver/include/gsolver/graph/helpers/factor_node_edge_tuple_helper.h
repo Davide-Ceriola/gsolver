@@ -68,10 +68,12 @@ namespace gsolver {
     // Compute the joint distribution conditioned on the current messages
     template <int VariablesDim_>
     Eigen::Matrix<double, VariablesDim_, VariablesDim_>
-    computeJointDistribution(Eigen::Matrix<double, VariablesDim_, VariablesDim_>& Lambdaprime, int offset = 0) {
+    computeJointDistribution(Eigen::Matrix<double, VariablesDim_, VariablesDim_>& Lambdaprime, int offset = 0,
+                             bool at_lin_point = false) {
       static const int edge_size = CurrentVariableType::LieDim;
-      Lambdaprime.block(offset, offset, edge_size, edge_size) += current_edge_->variable_to_factor_message_.Lambda_;
-      return RestFactorEdgeTuple::computeJointDistribution(Lambdaprime, offset + edge_size);
+      Lambdaprime.block(offset, offset, edge_size, edge_size) +=
+        at_lin_point ? linLambdaHere() : current_edge_->variable_to_factor_message_.Lambda_;
+      return RestFactorEdgeTuple::computeJointDistribution(Lambdaprime, offset + edge_size, at_lin_point);
     }
 
     // Send message from factor node to variable node
@@ -152,6 +154,11 @@ namespace gsolver {
       current_edge_->lin_point_     = beliefPoint();
       current_edge_->has_lin_point_ = true;
     }
+    // Incoming precision in the tangent space at the linearisation point (LieOptions transport)
+    typename CurrentVariableType::MatrixLieDim linLambdaHere() const {
+      const auto& m = current_edge_->variable_to_factor_message_;
+      return transportPrecision<CurrentVariableType>(current_edge_->lin_point_, m.mu_, m.Lambda_);
+    }
     void swapWithLinearisationPointHere() {
       std::swap(current_edge_->variable_to_factor_message_.mu_, current_edge_->lin_point_);
     }
@@ -159,7 +166,8 @@ namespace gsolver {
     template <int VariablesDim_>
     void incomingEtaHere(Eigen::Vector<double, VariablesDim_>& eta, int offset) const {
       const auto& m = current_edge_->variable_to_factor_message_;
-      eta.segment(offset, CurrentVariableType::LieDim) = m.Lambda_ * CurrentVariableType::boxminus(current_edge_->lin_point_, m.mu_);
+      eta.segment(offset, CurrentVariableType::LieDim) =
+        linLambdaHere() * CurrentVariableType::boxminus(current_edge_->lin_point_, m.mu_);
     }
     // Factor information vector plus every incoming one except this edge's (the outgoing message
     // excludes what this variable sent)
@@ -184,13 +192,15 @@ namespace gsolver {
       }
       using V            = CurrentVariableType;
       const auto& mine   = current_edge_->factor_to_variable_message_;
-      typename V::MatrixLieDim Lambda = m.Lambda_ - mine.Lambda_;
+      const typename V::MatrixLieDim mine_L = transportPrecision<V>(m.mu_, mine.mu_, mine.Lambda_);
+      typename V::MatrixLieDim Lambda       = m.Lambda_ - mine_L;
       symmetrize(Lambda);
-      const typename V::VectorLieDim eta = m.eta_ - mine.Lambda_ * V::boxminus(m.mu_, mine.mu_);
+      const typename V::VectorLieDim eta = m.eta_ - mine_L * V::boxminus(m.mu_, mine.mu_);
       const typename V::VectorLieDim tau =
         SpdSolver<V::LieDim>(typename V::MatrixLieDim(Lambda + V::MatrixLieDim::Identity() * kInformationRegularization)).solve(eta);
-      m.mu_        = V::boxplus(m.mu_, tau);
-      m.Lambda_    = Lambda;
+      const auto mu_cav = V::boxplus(m.mu_, tau);
+      m.Lambda_         = transportPrecision<V>(mu_cav, m.mu_, tau, Lambda);
+      m.mu_             = mu_cav;
       m.is_belief_ = false;
     }
     void convertBeliefMessages() {
@@ -260,9 +270,11 @@ namespace gsolver {
     // Compute the joint distribution conditioned on the current messages
     template <int VariablesDim_>
     Eigen::Matrix<double, VariablesDim_, VariablesDim_>
-    computeJointDistribution(Eigen::Matrix<double, VariablesDim_, VariablesDim_>& Lambdaprime, int offset = 0) {
+    computeJointDistribution(Eigen::Matrix<double, VariablesDim_, VariablesDim_>& Lambdaprime, int offset = 0,
+                             bool at_lin_point = false) {
       static const int edge_size = CurrentVariableType::LieDim;
-      Lambdaprime.block(offset, offset, edge_size, edge_size) += current_edge_->variable_to_factor_message_.Lambda_;
+      Lambdaprime.block(offset, offset, edge_size, edge_size) +=
+        at_lin_point ? linLambdaHere() : current_edge_->variable_to_factor_message_.Lambda_;
       return Lambdaprime;
     }
 
@@ -334,6 +346,11 @@ namespace gsolver {
       current_edge_->lin_point_     = beliefPoint();
       current_edge_->has_lin_point_ = true;
     }
+    // Incoming precision in the tangent space at the linearisation point (LieOptions transport)
+    typename CurrentVariableType::MatrixLieDim linLambdaHere() const {
+      const auto& m = current_edge_->variable_to_factor_message_;
+      return transportPrecision<CurrentVariableType>(current_edge_->lin_point_, m.mu_, m.Lambda_);
+    }
     void swapWithLinearisationPointHere() {
       std::swap(current_edge_->variable_to_factor_message_.mu_, current_edge_->lin_point_);
     }
@@ -341,7 +358,8 @@ namespace gsolver {
     template <int VariablesDim_>
     void incomingEtaHere(Eigen::Vector<double, VariablesDim_>& eta, int offset) const {
       const auto& m = current_edge_->variable_to_factor_message_;
-      eta.segment(offset, CurrentVariableType::LieDim) = m.Lambda_ * CurrentVariableType::boxminus(current_edge_->lin_point_, m.mu_);
+      eta.segment(offset, CurrentVariableType::LieDim) =
+        linLambdaHere() * CurrentVariableType::boxminus(current_edge_->lin_point_, m.mu_);
     }
     // Factor information vector plus every incoming one except this edge's (the outgoing message
     // excludes what this variable sent)
@@ -366,13 +384,15 @@ namespace gsolver {
       }
       using V            = CurrentVariableType;
       const auto& mine   = current_edge_->factor_to_variable_message_;
-      typename V::MatrixLieDim Lambda = m.Lambda_ - mine.Lambda_;
+      const typename V::MatrixLieDim mine_L = transportPrecision<V>(m.mu_, mine.mu_, mine.Lambda_);
+      typename V::MatrixLieDim Lambda       = m.Lambda_ - mine_L;
       symmetrize(Lambda);
-      const typename V::VectorLieDim eta = m.eta_ - mine.Lambda_ * V::boxminus(m.mu_, mine.mu_);
+      const typename V::VectorLieDim eta = m.eta_ - mine_L * V::boxminus(m.mu_, mine.mu_);
       const typename V::VectorLieDim tau =
         SpdSolver<V::LieDim>(typename V::MatrixLieDim(Lambda + V::MatrixLieDim::Identity() * kInformationRegularization)).solve(eta);
-      m.mu_        = V::boxplus(m.mu_, tau);
-      m.Lambda_    = Lambda;
+      const auto mu_cav = V::boxplus(m.mu_, tau);
+      m.Lambda_         = transportPrecision<V>(mu_cav, m.mu_, tau, Lambda);
+      m.mu_             = mu_cav;
       m.is_belief_ = false;
     }
     void convertBeliefMessages() {

@@ -1,4 +1,5 @@
 #include <gsolver/graph/types/factors/se2_prior.h>
+#include <gsolver/maths/lie_options.h>
 
 namespace gsolver {
 
@@ -13,6 +14,16 @@ namespace gsolver {
 
   void SE2Prior::evaluate(const Isometry2d& x, const Isometry2d& z, VectorErrorDim& error, MatrixJacobianDim& J) {
     const Isometry2d delta = z.inverse() * x;
+    if (LieOptions::true_exponential) {
+      error              = chartLogSE2(delta);
+      constexpr double e = 1e-6;
+      for (int k = 0; k < 3; ++k) {
+        Eigen::Vector3d d = Eigen::Vector3d::Zero();
+        d[k]              = e;
+        J.col(k) = (chartLogSE2(z.inverse() * SE2Pose::boxplus(x, d)) - chartLogSE2(z.inverse() * SE2Pose::boxplus(x, Eigen::Vector3d(-d)))) / (2 * e);
+      }
+      return;
+    }
     error                  = logMapSE2(delta);
 
     // log(delta * exp(tau)) = [t_delta + R_delta * tau_t, theta_delta + tau_theta] with this chart

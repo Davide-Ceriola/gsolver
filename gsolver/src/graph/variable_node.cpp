@@ -1,4 +1,5 @@
 #include <gsolver/graph/variable_node.h>
+#include <gsolver/maths/lie_options.h>
 
 namespace gsolver {
 
@@ -64,8 +65,8 @@ namespace gsolver {
       // Project to the tangent space
       VectorLieDim tangent_delta_mu_inward = boxminus(mu_inward);
 
-      // Compute the Lambda and eta
-      MatrixLieDim tangent_Lambda_inward = Lambdaprime_inward;
+      // Compute the Lambda and eta (precision moved to the tangent space at mu_: LieOptions)
+      MatrixLieDim tangent_Lambda_inward = transportPrecision<typename EdgeType_::VariableType_>(mu_, mu_inward, Lambdaprime_inward);
       VectorLieDim tangent_eta_inward    = tangent_Lambda_inward * tangent_delta_mu_inward;
 
       tangent_eta += tangent_eta_inward;
@@ -78,7 +79,9 @@ namespace gsolver {
 
     // compute the new estimate in the manifold
     EstimateType_ mu_outward         = boxplus(tangent_delta_mu);
-    MatrixLieDim Lambdaprime_outward = tangent_Lambdaprime;
+    // the precision is in the tangent space at mu_; the message is sent at mu_outward (LieOptions)
+    MatrixLieDim Lambdaprime_outward =
+      transportPrecision<typename EdgeType_::VariableType_>(mu_outward, mu_, tangent_delta_mu, tangent_Lambdaprime);
 
     edges_[outedge_id]->variable_to_factor_message_.Lambda_    = Lambdaprime_outward;
     edges_[outedge_id]->variable_to_factor_message_.mu_        = mu_outward;
@@ -156,7 +159,7 @@ namespace gsolver {
     MatrixLieDim total_Lambda = MatrixLieDim::Zero();
     for (size_t i = 0; i < k; ++i) {
       const auto& message   = edges_[i]->factor_to_variable_message_;
-      tangent_Lambda_in_[i] = message.Lambda_;
+      tangent_Lambda_in_[i] = transportPrecision<typename EdgeType_::VariableType_>(mu_, message.mu_, message.Lambda_);
       tangent_eta_in_[i]    = message.Lambda_ * boxminus(message.mu_);
       total_eta += tangent_eta_in_[i];
       total_Lambda += tangent_Lambda_in_[i];
@@ -171,8 +174,9 @@ namespace gsolver {
       const VectorLieDim tau = SpdSolver<Dim_>(MatrixLieDim(Lambda + MatrixLieDim::Identity() * kInformationRegularization))
                                  .solve(VectorLieDim(total_eta - tangent_eta_in_[j]));
 
-      edges_[j]->variable_to_factor_message_.Lambda_    = Lambda;
-      edges_[j]->variable_to_factor_message_.mu_        = boxplus(tau);
+      const EstimateType_ mu_out                        = boxplus(tau);
+      edges_[j]->variable_to_factor_message_.Lambda_    = transportPrecision<typename EdgeType_::VariableType_>(mu_out, mu_, tau, Lambda);
+      edges_[j]->variable_to_factor_message_.mu_        = mu_out;
       edges_[j]->variable_to_factor_message_.processed_ = false;
       edges_[j]->variable_to_factor_message_.belief_mu_  = mu_;
       edges_[j]->variable_to_factor_message_.has_belief_ = true;
@@ -199,8 +203,8 @@ namespace gsolver {
       // Handle the pose
       VectorLieDim tangent_delta_mu_inward = boxminus(mu_inward);
 
-      // Compute the Lambda and eta
-      MatrixLieDim tangent_Lambda_inward = Lambdaprime_inward;
+      // Compute the Lambda and eta (precision moved to the tangent space at mu_: LieOptions)
+      MatrixLieDim tangent_Lambda_inward = transportPrecision<typename EdgeType_::VariableType_>(mu_, mu_inward, Lambdaprime_inward);
       VectorLieDim tangent_eta_inward    = tangent_Lambda_inward * tangent_delta_mu_inward;
 
       tangent_eta += tangent_eta_inward;
@@ -240,8 +244,9 @@ namespace gsolver {
     eta.setZero();
     for (const auto& edge : edges_) {
       const auto& m = edge->factor_to_variable_message_;
-      Lambda += m.Lambda_;
-      eta += m.Lambda_ * boxminus(m.mu_);
+      const MatrixLieDim L = transportPrecision<typename EdgeType_::VariableType_>(mu_, m.mu_, m.Lambda_);
+      Lambda += L;
+      eta += L * boxminus(m.mu_);
     }
   }
 

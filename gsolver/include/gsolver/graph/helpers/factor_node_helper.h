@@ -3,6 +3,7 @@
 #include <Eigen/Dense>
 
 #include <gsolver/graph/message_update.h>
+#include <gsolver/maths/lie_options.h>
 #include <gsolver/maths/symmetric.h>
 
 namespace gsolver {
@@ -75,7 +76,9 @@ namespace gsolver {
       Lambdaprime_M + Eigen::Matrix<double, a_size, a_size>::Identity() * kInformationRegularization;
     Eigen::Vector<double, a_size> tau                    = SpdSolver<a_size>(Lambda_solve).solve(eta_M);
     EstimateType mu_outward                              = VariableType::boxplus(mu_to_update, tau);
-    Eigen::Matrix<double, a_size, a_size> Lambda_outward = Lambdaprime_M;
+    // Lambdaprime_M is in the tangent space at mu_to_update; the message is sent at mu_outward
+    Eigen::Matrix<double, a_size, a_size> Lambda_outward =
+      transportPrecision<VariableType>(mu_outward, mu_to_update, tau, Lambdaprime_M);
 
     // Return the message
     Message<VariableType> message;

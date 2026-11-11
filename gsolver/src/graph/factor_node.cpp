@@ -45,7 +45,8 @@ namespace gsolver {
 
     // Update Lambda by conditioning on the connected edges
     Lambdaprime_conditioned_ = Lambdaprime_;
-    Lambdaprime_conditioned_ = edges_.template computeJointDistribution<VariablesDim_>(Lambdaprime_conditioned_);
+    Lambdaprime_conditioned_ =
+      edges_.template computeJointDistribution<VariablesDim_>(Lambdaprime_conditioned_, 0, linearise_at_belief_);
     if (linearise_at_belief_) {
       edges_.template incomingEta<VariablesDim_>(incoming_eta_);
     } else {

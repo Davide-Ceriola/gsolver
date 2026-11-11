@@ -3,7 +3,10 @@
 // =============================================================================
 
 #include <nanobind/nanobind.h>
+#include <nanobind/stl/pair.h>
 #include <nanobind/stl/string.h> // Required for std::string conversion in all bindings
+
+#include <gsolver/maths/lie_options.h>
 
 namespace nb = nanobind;
 
@@ -71,6 +74,20 @@ NB_MODULE(_gsolver, m) {
   // Graph module - typed edges (require variable types to be registered)
   gsolver::python::bind_pose_graph(m); // SE2Pose must be registered before its edge type
   gsolver::python::bind_edge(m);
+  // Global chart / transport options for the pose-graph types (maths/lie_options.h)
+  m.def(
+    "set_lie_options",
+    [](bool true_exponential, bool exact_transport) {
+      gsolver::LieOptions::true_exponential = true_exponential;
+      gsolver::LieOptions::exact_transport  = exact_transport;
+    },
+    nb::arg("true_exponential"),
+    nb::arg("exact_transport"),
+    "true_exponential: SE(2)/SE(3) group exponential as the chart (else R^n x SO(n)); "
+    "exact_transport: move precisions between tangent spaces with the chart-change Jacobian");
+  m.def("lie_options", []() {
+    return std::make_pair(gsolver::LieOptions::true_exponential, gsolver::LieOptions::exact_transport);
+  });
   gsolver::python::bind_rule_scheduler(m);
 
   // Graph module - factor types

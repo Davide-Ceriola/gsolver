@@ -1,4 +1,5 @@
 #include <gsolver/graph/types/factors/se2_odometry.h>
+#include <gsolver/maths/lie_options.h>
 
 namespace gsolver {
 
@@ -19,6 +20,20 @@ namespace gsolver {
                              MatrixJacobianDim& J) {
     const Isometry2d h     = xi.inverse() * xj;
     const Isometry2d delta = z.inverse() * h;
+    if (LieOptions::true_exponential) {
+      // Group exponential: error in its chart, Jacobian by central differences of that error
+      error              = chartLogSE2(delta);
+      constexpr double e = 1e-6;
+      for (int k = 0; k < 6; ++k) {
+        Eigen::Vector3d d = Eigen::Vector3d::Zero();
+        d[k % 3]          = e;
+        const bool on_i   = k < 3;
+        const Isometry2d ip = on_i ? SE2Pose::boxplus(xi, d) : xi, im = on_i ? SE2Pose::boxplus(xi, Eigen::Vector3d(-d)) : xi;
+        const Isometry2d jp = on_i ? xj : SE2Pose::boxplus(xj, d), jm = on_i ? xj : SE2Pose::boxplus(xj, Eigen::Vector3d(-d));
+        J.col(k) = (chartLogSE2(z.inverse() * ip.inverse() * jp) - chartLogSE2(z.inverse() * im.inverse() * jm)) / (2 * e);
+      }
+      return;
+    }
     error                  = logMapSE2(delta);
 
     const Eigen::Matrix2d Rz_t = z.linear().transpose();
