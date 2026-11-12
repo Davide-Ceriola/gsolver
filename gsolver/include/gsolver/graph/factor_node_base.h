@@ -54,6 +54,7 @@ namespace gsolver {
     // 0.5 e^T Sigma^-1 e at the last updateFactor, i.e. at the factor's incoming messages: the
     // scalar a factor can attach to its replies (no robust kernel applied)
     virtual double energy() const = 0;
+    virtual int errorDim() const  = 0; // dimension of the factor's error
 
     // Factor-side scheduling, for schedulers that also decide the factor's replies and the damping
     // of what it receives (per-edge reply_selected_ / v2f_damping_ in Edge). Per tick:

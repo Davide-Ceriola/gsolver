@@ -35,6 +35,19 @@ public:
   // computed once and sent on all of them
   virtual void sendMessages(const std::vector<int>& mask) = 0;
 
+  // ---- Generic rule inputs (core/generic_scheduler.h), computed by the typed variable ----
+  static constexpr int kRuleInputs = 9;
+  virtual int lieDim() const = 0;
+  virtual void ruleReset()   = 0;
+  // Rows (one per edge, kRuleInputs columns, row stride `stride`) of the variable's rule inputs;
+  // edge_energy[j]: energy per error dimension of the factor on edge j. update: advance the state
+  // (previous energies, uncertainty, oscillation)
+  virtual void ruleInputs(long tick, const double* edge_energy, double* out, int stride, bool update) = 0;
+  // Record the sends of this tick (before the belief update): last-sent belief, tick and gap
+  virtual void ruleRecordSends(const std::vector<int>& mask, long tick) = 0;
+  // Set the damping of the incoming factor-to-variable message on edge j
+  virtual void setIncomingDamping(size_t j, double d) = 0;
+
   // Send the belief instead of per-edge messages (one computation, same for every edge); factors
   // recover the per-edge messages exactly. Off by default.
   bool send_belief_ = false;

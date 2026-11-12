@@ -279,4 +279,112 @@ namespace gsolver {
     }
   }
 
+  // ---- Generic rule inputs (core/generic_scheduler.h): every input is invariant to the units and
+  // to linear reparametrisations of the tangent space, and normalised per dimension, so variables
+  // of any type and size give comparable values.
+  template <int Dim_, typename EstimateType_, typename EdgeType_>
+  void VariableNode<Dim_, EstimateType_, EdgeType_>::ruleReset() {
+    rule_has_logdet_ = false;
+    for (auto& e : edges_) {
+      e->last_sent_mu_    = mu_;
+      e->last_sent_tick_  = 0;
+      e->incoming_gap_    = 0;
+      e->has_last_sent_   = true;
+      e->v_osc_has_prev_  = false;
+      e->v_osc_has_delta_ = false;
+      e->v_osc_cos_       = 0.0;
+      e->prev_energy_     = -1.0;
+    }
+  }
+
+  template <int Dim_, typename EstimateType_, typename EdgeType_>
+  void VariableNode<Dim_, EstimateType_, EdgeType_>::ruleRecordSends(const std::vector<int>& mask, long tick) {
+    for (size_t j = 0; j < mask.size() && j < edges_.size(); ++j) {
+      if (mask[j]) {
+        auto& e           = edges_[j];
+        e->incoming_gap_  = tick - e->last_sent_tick_;
+        e->last_sent_tick_ = tick;
+        e->last_sent_mu_  = mu_;
+        e->has_last_sent_ = true;
+      }
+    }
+  }
+
+  template <int Dim_, typename EstimateType_, typename EdgeType_>
+  void VariableNode<Dim_, EstimateType_, EdgeType_>::ruleInputs(long tick, const double* edge_energy, double* out,
+                                                               int stride, bool update) {
+    using V            = typename EdgeType_::VariableType_;
+    constexpr double e = 1e-9;
+    // Changes below a thousandth of a standard deviation (per dimension) count as no change: below
+    // that the inputs would only carry numerical noise
+    constexpr double kSigmaFloor = 1e-3;
+    const size_t k     = edges_.size();
+    const double d     = static_cast<double>(Dim_);
+    const MatrixLieDim Lb = SpdSolver<Dim_>(Sigma_).solve(MatrixLieDim(MatrixLieDim::Identity())); // belief precision
+    // uncertainty trend: mean log eigenvalue change of the covariance
+    const double logdet = Eigen::LDLT<MatrixLieDim>(Sigma_).vectorD().array().max(1e-300).log().sum();
+    const double trend  = rule_has_logdet_ ? std::clamp((logdet - rule_prev_logdet_) / d, -5.0, 5.0) : 0.0;
+    std::vector<double> moved(k), share(k);
+    double mean_moved = 0.0, mean_energy = 0.0;
+    for (size_t j = 0; j < k; ++j) {
+      const VectorLieDim dm = V::boxminus(edges_[j]->last_sent_mu_, mu_);
+      moved[j]              = std::sqrt(std::max(dm.dot(Lb * dm), 0.0) / d);
+      mean_moved += moved[j];
+      mean_energy += edge_energy[j];
+    }
+    mean_moved  = k ? mean_moved / k : 0.0;
+    mean_energy = std::max(k ? mean_energy / k : 0.0, e);
+    for (size_t j = 0; j < k; ++j) {
+      auto& ed              = *edges_[j];
+      const auto& msg       = ed.factor_to_variable_message_;
+      const double E        = edge_energy[j];
+      const double E_prev   = ed.prev_energy_ < 0 ? E : ed.prev_energy_;
+      // the share of the belief's precision this message provides, per dimension
+      share[j] = (msg.Lambda_ * Sigma_).trace() / d;
+      // disagreement in the combined metric (Sigma_b + Sigma_m)^-1 = Lm (Lb + Lm)^-1 Lb
+      const VectorLieDim r   = V::boxminus(mu_, msg.mu_);
+      const MatrixLieDim Mc  = msg.Lambda_ * SpdSolver<Dim_>(MatrixLieDim(Lb + msg.Lambda_ +
+                                 MatrixLieDim::Identity() * kInformationRegularization)).solve(Lb);
+      const double disagree = std::sqrt(std::max(r.dot(Mc * r), 0.0) / d);
+      // oscillation of the incoming message, in the belief's metric
+      double cos = ed.v_osc_cos_;
+      if (ed.v_osc_has_prev_) {
+        const VectorLieDim delta = V::boxminus(ed.v_osc_prev_, msg.mu_);
+        const double sq          = delta.dot(Lb * delta);
+        if (std::sqrt(std::max(sq, 0.0) / d) > kSigmaFloor) {
+          if (ed.v_osc_has_delta_) {
+            const double a = std::sqrt(std::max(ed.v_osc_delta_.dot(Lb * ed.v_osc_delta_), 0.0));
+            if (a > 1e-12) {
+              cos = delta.dot(Lb * ed.v_osc_delta_) / (std::sqrt(sq) * a);
+            }
+          }
+          if (update) {
+            ed.v_osc_delta_     = delta;
+            ed.v_osc_has_delta_ = true;
+            ed.v_osc_cos_       = cos;
+          }
+        }
+      }
+      double* row = out + j * stride;
+      row[0] = std::log1p(static_cast<double>(std::max(tick - ed.last_sent_tick_, 0L)));
+      row[1] = std::log(moved[j] + kSigmaFloor);
+      row[2] = std::log((moved[j] + kSigmaFloor) / (mean_moved + kSigmaFloor));
+      row[3] = trend;
+      row[4] = std::log((E + e) / mean_energy);
+      row[5] = std::clamp(std::log((E + e) / (E_prev + e)), -5.0, 5.0);
+      row[6] = std::log(share[j] + e);
+      row[7] = std::log(disagree + kSigmaFloor);
+      row[8] = cos;
+      if (update) {
+        ed.prev_energy_    = E;
+        ed.v_osc_prev_     = msg.mu_;
+        ed.v_osc_has_prev_ = true;
+      }
+    }
+    if (update) {
+      rule_prev_logdet_ = logdet;
+      rule_has_logdet_  = true;
+    }
+  }
+
 } // namespace gsolver

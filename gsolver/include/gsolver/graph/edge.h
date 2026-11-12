@@ -1,6 +1,9 @@
 #pragma once
 
+#include <algorithm>
+#include <cmath>
 #include <stdexcept>
+#include <vector>
 
 #include <Eigen/Dense>
 
@@ -44,19 +47,84 @@ namespace gsolver {
     MessageType variable_to_factor_message_;
     MessageType factor_to_variable_message_;
 
-    // Damping of the factor-to-variable message on this edge, set by a scheduler; negative: the
-    // factor's own (MessageUpdate::damping)
-    double damping_ = -1.0;
+
+    // ---- Generic rule state (core/generic_scheduler.h) ----
+    using EstimateT = typename MessageType::EstimateType;
+    using VectorT   = Eigen::Matrix<double, MessageType::MatrixLieDim::RowsAtCompileTime, 1>;
+    // variable side
+    EstimateT last_sent_mu_;
+    long last_sent_tick_  = 0;
+    bool has_last_sent_   = false;
+    EstimateT v_osc_prev_;
+    VectorT v_osc_delta_ = VectorT::Zero();
+    bool v_osc_has_prev_ = false, v_osc_has_delta_ = false;
+    double v_osc_cos_    = 0.0;
+    double prev_energy_  = -1.0;
+    // factor side
+    EstimateT f_inc_prev_;
+    VectorT f_inc_delta_ = VectorT::Zero();
+    bool f_inc_has_prev_ = false, f_inc_has_delta_ = false;
+    double f_inc_cos_    = 0.0;
+    std::vector<EstimateT> f_news_snap_;
+
+    bool incomingFresh() const override {
+      return !variable_to_factor_message_.processed_;
+    }
+
+    int lieDim() const override {
+      return MessageType::MatrixLieDim::RowsAtCompileTime;
+    }
+
+    void ruleIncoming(bool fresh, double& change_per_dim, double& oscillation) override {
+      const auto& m = variable_to_factor_message_;
+      change_per_dim = 0.0;
+      if (fresh && f_inc_has_prev_) {
+        const VectorT d   = VariableType::boxminus(f_inc_prev_, m.mu_);
+        const double sq   = d.dot(m.Lambda_ * d);
+        change_per_dim    = std::sqrt(std::max(sq, 0.0) / lieDim());
+        if (change_per_dim > 1e-3) { // below a thousandth of a sigma: no change
+          if (f_inc_has_delta_) {
+            const double a = std::sqrt(std::max(f_inc_delta_.dot(m.Lambda_ * f_inc_delta_), 0.0));
+            if (a > 1e-12) {
+              f_inc_cos_ = d.dot(m.Lambda_ * f_inc_delta_) / (std::sqrt(sq) * a);
+            }
+          }
+          f_inc_delta_     = d;
+          f_inc_has_delta_ = true;
+        }
+      }
+      if (fresh || !f_inc_has_prev_) {
+        f_inc_prev_     = m.mu_;
+        f_inc_has_prev_ = true;
+      }
+      oscillation = f_inc_cos_;
+    }
+
+    double ruleNewsSince(size_t p) const override {
+      const auto& m = variable_to_factor_message_;
+      if (p >= f_news_snap_.size() || m.Lambda_.isZero(0.0)) {
+        return 0.0;
+      }
+      const VectorT d = VariableType::boxminus(f_news_snap_[p], m.mu_);
+      return std::sqrt(std::max(d.dot(m.Lambda_ * d), 0.0) / lieDim());
+    }
+
+    void ruleSnapNews(size_t p) override {
+      if (p < f_news_snap_.size()) {
+        f_news_snap_[p] = variable_to_factor_message_.mu_;
+      }
+    }
+
+    void ruleResetFactorSide(size_t factor_arity) override {
+      f_news_snap_.assign(factor_arity, variable_to_factor_message_.mu_);
+      f_inc_has_prev_ = f_inc_has_delta_ = false;
+      f_inc_cos_      = 0.0;
+    }
 
     // Factor-side scheduling (FactorNodeBase::sendRepliesIfPending):
-    //  reply_pending_:  the factor has new information for this variable it has not sent yet
-    //  reply_selected_: the factor's scheduler lets it reply on this edge now (1) or not (0)
-    bool reply_pending_ = false;
-    int reply_selected_ = 1;
     // Damping of the incoming variable-to-factor message, applied by the factor when it receives
     // a new one (FactorNodeBase::prepareIncoming); negative: none. v2f_prev_ is the last
     // (damped) incoming message.
-    double v2f_damping_ = -1.0;
     MessageType v2f_prev_;
     bool has_v2f_prev_ = false;
 

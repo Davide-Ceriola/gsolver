@@ -26,6 +26,7 @@ add_executable(gsolver_tests
     test_incremental.cpp
     test_se3_pose_graph.cpp
     test_lie_options.cpp
+    test_generic_scheduler.cpp
 )
 target_link_libraries(gsolver_tests PRIVATE gsolver::gsolver GTest::gtest_main)
 # One OpenMP thread per test: the graphs are tiny, and ctest runs tests in

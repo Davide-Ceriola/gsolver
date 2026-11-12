@@ -8,6 +8,7 @@
 #include <nanobind/stl/pair.h>
 #include <nanobind/stl/vector.h>
 
+#include <gsolver/core/generic_scheduler.h>
 #include <gsolver/core/rule_scheduler.h>
 #include <gsolver/graph/types/variables/se2_pose.h>
 #include <gsolver/graph/types/variables/se3_pose.h>
@@ -85,6 +86,42 @@ namespace gsolver {
         .def_rw("damping_coef", &SendRule::damping_coef)
         .def_rw("damping_intercept", &SendRule::damping_intercept)
         .def_rw("damping_max", &SendRule::damping_max);
+      // ---- v4: GenericScheduler (any variable types; unit-invariant inputs) ----
+      m.attr("VARIABLE_INPUT_NAMES_V4") = kVariableInputNamesV4;
+      m.attr("FACTOR_INPUT_NAMES_V4")   = kFactorInputNamesV4;
+      nb::class_<VariableRule>(m, "VariableRule", "Variable rule: send head (or fixed_send) and incoming damping head")
+        .def(nb::init<>())
+        .def_rw("send", &VariableRule::send)
+        .def_rw("damping", &VariableRule::damping)
+        .def_rw("fixed_send", &VariableRule::fixed_send);
+      using G = GenericScheduler;
+      nb::class_<G>(m, "GenericScheduler", "Learned local rules on any factor graph (core/generic_scheduler.h)")
+        .def(nb::init<FactorGraph&, VariableRule, FactorRule, unsigned>(), nb::arg("graph"), nb::arg("variable_rule"),
+             nb::arg("factor_rule"), nb::arg("seed") = 0, nb::keep_alive<1, 2>())
+        .def("reset", &G::reset)
+        .def("features", &G::variableFeatures, nb::arg("update_state") = true, nb::call_guard<nb::gil_scoped_release>(),
+             "Variable rule inputs (edges x len(VARIABLE_INPUT_NAMES_V4))")
+        .def(
+          "tick",
+          [](G& s, const Eigen::VectorXd& uniforms) {
+            nb::gil_scoped_release release;
+            const TickCounts c = s.tick(uniforms);
+            return std::make_pair(c.variable_to_factor, c.factor_to_variable);
+          },
+          nb::arg("uniforms") = Eigen::VectorXd())
+        .def(
+          "tick_masks",
+          [](G& s, const std::vector<std::vector<int>>& masks) {
+            nb::gil_scoped_release release;
+            const TickCounts c = s.tickMasks(masks);
+            return std::make_pair(c.variable_to_factor, c.factor_to_variable);
+          },
+          nb::arg("masks"))
+        .def("last_factor_features", [](const G& s) { return Eigen::MatrixXd(s.lastFactorFeatures()); })
+        .def_rw("record_factor_features", &G::record_factor_features_)
+        .def_prop_ro("ticks", &G::ticks)
+        .def_prop_ro("num_edges", &G::numberOfEdges);
+
       bind_rule_scheduler_type<SE2Pose>(m, "RuleSchedulerSE2");
       bind_rule_scheduler_type<SE3Pose>(m, "RuleSchedulerSE3");
     }

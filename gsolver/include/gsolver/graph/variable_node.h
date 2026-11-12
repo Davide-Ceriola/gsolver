@@ -31,6 +31,15 @@ namespace gsolver {
     void sendMessage(const std::string& factor_id) override;
     void sendAllMessages() override;
     void sendMessages(const std::vector<int>& mask) override;
+    int lieDim() const override {
+      return LieDim_;
+    }
+    void ruleReset() override;
+    void ruleInputs(long tick, const double* edge_energy, double* out, int stride, bool update) override;
+    void ruleRecordSends(const std::vector<int>& mask, long tick) override;
+    void setIncomingDamping(size_t j, double d) override {
+      edges_.at(j)->damping_ = d;
+    }
     void updateMuAndSigma() override;
     bool hasUnprocessedMessages() const override;
     void markMessagesProcessed() override;
@@ -45,6 +54,8 @@ namespace gsolver {
     void removeEdge(const std::string& factor_id) override;
 
   private:
+    double rule_prev_logdet_ = 0.0;
+    bool rule_has_logdet_    = false;
     // The belief message (send_belief_): mean, total precision and information vector at the mean
     template <typename MessageType>
     void writeBelief(MessageType& message, const MatrixLieDim& Lambda, const VectorLieDim& eta) const {

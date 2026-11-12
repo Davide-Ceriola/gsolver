@@ -78,6 +78,9 @@ namespace gsolver {
       edges_.dampIncoming();
     }
     size_t sendRepliesIfPending() override;
+    int errorDim() const override {
+      return Dim_;
+    }
     double energy() const override {
       return 0.5 * error_.dot(Sigma_.ldlt().solve(error_));
     }
