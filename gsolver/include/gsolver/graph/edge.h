@@ -48,6 +48,18 @@ namespace gsolver {
     // factor's own (MessageUpdate::damping)
     double damping_ = -1.0;
 
+    // Factor-side scheduling (FactorNodeBase::sendRepliesIfPending):
+    //  reply_pending_:  the factor has new information for this variable it has not sent yet
+    //  reply_selected_: the factor's scheduler lets it reply on this edge now (1) or not (0)
+    bool reply_pending_ = false;
+    int reply_selected_ = 1;
+    // Damping of the incoming variable-to-factor message, applied by the factor when it receives
+    // a new one (FactorNodeBase::prepareIncoming); negative: none. v2f_prev_ is the last
+    // (damped) incoming message.
+    double v2f_damping_ = -1.0;
+    MessageType v2f_prev_;
+    bool has_v2f_prev_ = false;
+
     // The factor's linearisation point for this variable (linearise_at_belief_ mode only)
     typename VariableType::EstimateType lin_point_;
     bool has_lin_point_ = false;

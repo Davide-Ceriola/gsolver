@@ -73,6 +73,11 @@ namespace gsolver {
       edges_.setAllMessagesProcessed();
     }
     bool updateFactorIfNew() override;
+    void prepareIncoming() override {
+      edges_.convertBeliefMessages();
+      edges_.dampIncoming();
+    }
+    size_t sendRepliesIfPending() override;
     double energy() const override {
       return 0.5 * error_.dot(Sigma_.ldlt().solve(error_));
     }

@@ -207,6 +207,70 @@ namespace gsolver {
       convertBeliefHere();
       RestFactorEdgeTuple::convertBeliefMessages();
     }
+    // ---- Factor-side scheduling ----
+    void markPendingHere() {
+      current_edge_->reply_pending_ = true;
+    }
+    // Damp a new incoming (variable-to-factor) message with this edge's v2f_damping_, the same
+    // mixing as storeMessage; keeps the last incoming message for the next one
+    void dampIncomingHere() {
+      auto& m = current_edge_->variable_to_factor_message_;
+      if (m.processed_) {
+        return; // nothing new on this edge
+      }
+      if (current_edge_->v2f_damping_ > 0.0 && current_edge_->has_v2f_prev_) {
+        MessageUpdate no_dropout;
+        auto mixed = current_edge_->v2f_prev_;
+        storeMessage(mixed, m, no_dropout, current_edge_->v2f_damping_);
+        m.mu_     = mixed.mu_;
+        m.Lambda_ = mixed.Lambda_;
+      }
+      current_edge_->v2f_prev_     = m;
+      current_edge_->has_v2f_prev_ = true;
+    }
+    template <int VariablesDim_, int out_offset_>
+    size_t sendPendingHere(const Eigen::Vector<double, VariablesDim_>& factor_eta,
+                           const Eigen::Matrix<double, VariablesDim_, VariablesDim_>& factor_Lambdaprime,
+                           const Eigen::Matrix<double, VariablesDim_, VariablesDim_>& conditioned_Lambdaprime,
+                           MessageUpdate& update,
+                           const Eigen::Vector<double, VariablesDim_>& incoming_eta,
+                           bool at_lin_point) {
+      if (!current_edge_->reply_pending_ || !current_edge_->reply_selected_) {
+        return 0;
+      }
+      static const int total_size = VariablesDim_;
+      static const int a_size     = CurrentVariableType::LieDim;
+      static const int b_size     = total_size - a_size;
+      const size_t stored = storeMessage(current_edge_->factor_to_variable_message_,
+                                         computeMessage<CurrentVariableType, out_offset_, a_size, b_size>(
+                                           etaExcluding<VariablesDim_, out_offset_, a_size>(factor_eta, incoming_eta),
+                                           factor_Lambdaprime, conditioned_Lambdaprime, outgoingPoint(at_lin_point)),
+                                         update, current_edge_->damping_);
+      current_edge_->reply_pending_ = false;
+      return stored;
+    }
+
+    void markPendingAll() {
+      markPendingHere();
+      RestFactorEdgeTuple::markPendingAll();
+    }
+    void dampIncoming() {
+      dampIncomingHere();
+      RestFactorEdgeTuple::dampIncoming();
+    }
+    template <int VariablesDim_, int out_offset_ = 0>
+    size_t sendPending(const Eigen::Vector<double, VariablesDim_>& factor_eta,
+                       const Eigen::Matrix<double, VariablesDim_, VariablesDim_>& factor_Lambdaprime,
+                       const Eigen::Matrix<double, VariablesDim_, VariablesDim_>& conditioned_Lambdaprime,
+                       MessageUpdate& update,
+                       const Eigen::Vector<double, VariablesDim_>& incoming_eta,
+                       bool at_lin_point) {
+      static const int next_out_offset = out_offset_ + CurrentVariableType::LieDim;
+      const size_t n = sendPendingHere<VariablesDim_, out_offset_>(factor_eta, factor_Lambdaprime, conditioned_Lambdaprime,
+                                                                   update, incoming_eta, at_lin_point);
+      return n + RestFactorEdgeTuple::template sendPending<VariablesDim_, next_out_offset>(
+                   factor_eta, factor_Lambdaprime, conditioned_Lambdaprime, update, incoming_eta, at_lin_point);
+    }
     bool needsRelinearisation(double tolerance) const {
       return needsRelinearisationHere(tolerance) || RestFactorEdgeTuple::needsRelinearisation(tolerance);
     }
@@ -397,6 +461,65 @@ namespace gsolver {
     }
     void convertBeliefMessages() {
       convertBeliefHere();
+    }
+    // ---- Factor-side scheduling ----
+    void markPendingHere() {
+      current_edge_->reply_pending_ = true;
+    }
+    // Damp a new incoming (variable-to-factor) message with this edge's v2f_damping_, the same
+    // mixing as storeMessage; keeps the last incoming message for the next one
+    void dampIncomingHere() {
+      auto& m = current_edge_->variable_to_factor_message_;
+      if (m.processed_) {
+        return; // nothing new on this edge
+      }
+      if (current_edge_->v2f_damping_ > 0.0 && current_edge_->has_v2f_prev_) {
+        MessageUpdate no_dropout;
+        auto mixed = current_edge_->v2f_prev_;
+        storeMessage(mixed, m, no_dropout, current_edge_->v2f_damping_);
+        m.mu_     = mixed.mu_;
+        m.Lambda_ = mixed.Lambda_;
+      }
+      current_edge_->v2f_prev_     = m;
+      current_edge_->has_v2f_prev_ = true;
+    }
+    template <int VariablesDim_, int out_offset_>
+    size_t sendPendingHere(const Eigen::Vector<double, VariablesDim_>& factor_eta,
+                           const Eigen::Matrix<double, VariablesDim_, VariablesDim_>& factor_Lambdaprime,
+                           const Eigen::Matrix<double, VariablesDim_, VariablesDim_>& conditioned_Lambdaprime,
+                           MessageUpdate& update,
+                           const Eigen::Vector<double, VariablesDim_>& incoming_eta,
+                           bool at_lin_point) {
+      if (!current_edge_->reply_pending_ || !current_edge_->reply_selected_) {
+        return 0;
+      }
+      static const int total_size = VariablesDim_;
+      static const int a_size     = CurrentVariableType::LieDim;
+      static const int b_size     = total_size - a_size;
+      const size_t stored = storeMessage(current_edge_->factor_to_variable_message_,
+                                         computeMessage<CurrentVariableType, out_offset_, a_size, b_size>(
+                                           etaExcluding<VariablesDim_, out_offset_, a_size>(factor_eta, incoming_eta),
+                                           factor_Lambdaprime, conditioned_Lambdaprime, outgoingPoint(at_lin_point)),
+                                         update, current_edge_->damping_);
+      current_edge_->reply_pending_ = false;
+      return stored;
+    }
+
+    void markPendingAll() {
+      markPendingHere();
+    }
+    void dampIncoming() {
+      dampIncomingHere();
+    }
+    template <int VariablesDim_, int out_offset_ = 0>
+    size_t sendPending(const Eigen::Vector<double, VariablesDim_>& factor_eta,
+                       const Eigen::Matrix<double, VariablesDim_, VariablesDim_>& factor_Lambdaprime,
+                       const Eigen::Matrix<double, VariablesDim_, VariablesDim_>& conditioned_Lambdaprime,
+                       MessageUpdate& update,
+                       const Eigen::Vector<double, VariablesDim_>& incoming_eta,
+                       bool at_lin_point) {
+      return sendPendingHere<VariablesDim_, out_offset_>(factor_eta, factor_Lambdaprime, conditioned_Lambdaprime, update,
+                                                         incoming_eta, at_lin_point);
     }
     bool needsRelinearisation(double tolerance) const {
       return needsRelinearisationHere(tolerance);

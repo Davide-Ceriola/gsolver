@@ -244,3 +244,89 @@ TEST(EdgeDamping, SameAsFactorDamping) {
     ASSERT_LT(maxDifference(a, b), 1e-12) << "iteration " << it;
   }
 }
+
+namespace {
+  // A tick through the factor-side scheduling path (prepareIncoming / sendRepliesIfPending)
+  size_t factorScheduledTick(FactorGraph& g) {
+    for (auto& v : g.variable_nodes_) {
+      for (size_t i = 0; i < v->numberOfEdges(); ++i) {
+        v->sendMessage(i);
+      }
+      v->markMessagesProcessed();
+    }
+    size_t replies = 0;
+    for (auto& f : g.factor_nodes_) {
+      f->prepareIncoming();
+      f->updateFactorIfNew();
+      replies += f->sendRepliesIfPending();
+    }
+    for (auto& v : g.variable_nodes_) {
+      v->updateMuAndSigma();
+    }
+    return replies;
+  }
+
+  template <typename F>
+  void forEachEdge(Loop& l, F&& fn) {
+    for (auto& v : l.poses) {
+      for (auto& e : v->edges_) {
+        fn(*e);
+      }
+    }
+  }
+} // namespace
+
+TEST(FactorScheduling, AllRepliesNoDampingEqualsTheIncrementalTick) {
+  Loop a, b;
+  buildLoop(a, 8, 8);
+  buildLoop(b, 8, 8);
+  for (int it = 0; it < 40; ++it) {
+    const size_t ra = incrementalTick(a.graph);
+    const size_t rb = factorScheduledTick(b.graph);
+    ASSERT_EQ(ra, rb);
+    ASSERT_LT(maxDifference(a, b), 1e-12) << "iteration " << it;
+  }
+}
+
+TEST(FactorScheduling, UnsentRepliesStayPending) {
+  Loop l;
+  buildLoop(l, 6, 9);
+  factorScheduledTick(l.graph); // settle the first messages
+  // Hold every reply this tick: the variables send, the factors update, nothing goes back
+  forEachEdge(l, [](auto& e) { e.reply_selected_ = 0; });
+  EXPECT_EQ(factorScheduledTick(l.graph), 0u);
+  // Next tick: nothing new is sent to the factors, but the held replies go out
+  forEachEdge(l, [](auto& e) { e.reply_selected_ = 1; });
+  size_t replies = 0;
+  for (auto& f : l.graph.factor_nodes_) {
+    f->prepareIncoming();
+    f->updateFactorIfNew();
+    replies += f->sendRepliesIfPending();
+  }
+  EXPECT_EQ(replies, 1u + 2u * 6u);
+  // And they are sent once
+  for (auto& f : l.graph.factor_nodes_) {
+    EXPECT_EQ(f->sendRepliesIfPending(), 0u);
+  }
+}
+
+TEST(FactorScheduling, IncomingDamping) {
+  // zero damping changes nothing; damping 0.5 still solves the loop
+  Loop a, b, c;
+  buildLoop(a, 8, 10);
+  buildLoop(b, 8, 10);
+  buildLoop(c, 8, 10);
+  forEachEdge(b, [](auto& e) { e.v2f_damping_ = 0.0; });
+  forEachEdge(c, [](auto& e) { e.v2f_damping_ = 0.5; });
+  for (int it = 0; it < 300; ++it) {
+    factorScheduledTick(a.graph);
+    factorScheduledTick(b.graph);
+    factorScheduledTick(c.graph);
+    if (it < 40) {
+      ASSERT_LT(maxDifference(a, b), 1e-12) << "iteration " << it;
+    }
+  }
+  EXPECT_GT(maxDifference(a, c), 0.0);
+  // c converged to the same fixed point as a
+  EXPECT_LT(maxDifference(a, c), 1e-6);
+}

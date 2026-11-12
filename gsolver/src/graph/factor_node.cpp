@@ -92,4 +92,15 @@ namespace gsolver {
     return stored;
   }
 
+  template <int Dim_, typename... VariableTypes_>
+  size_t FactorNode<Dim_, VariableTypes_...>::sendRepliesIfPending() {
+    if (edges_.hasUnprocessedMessage()) {
+      edges_.markPendingAll(); // new information for every variable
+      edges_.setAllMessagesProcessed();
+    }
+    message_update_.prepare(id_);
+    return edges_.template sendPending<VariablesDim_>(eta_, Lambdaprime_, Lambdaprime_conditioned_, message_update_,
+                                                      incoming_eta_, linearise_at_belief_);
+  }
+
 } // namespace gsolver
