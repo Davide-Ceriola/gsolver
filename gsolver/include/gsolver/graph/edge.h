@@ -44,6 +44,10 @@ namespace gsolver {
     MessageType variable_to_factor_message_;
     MessageType factor_to_variable_message_;
 
+    // Damping of the factor-to-variable message on this edge, set by a scheduler; negative: the
+    // factor's own (MessageUpdate::damping)
+    double damping_ = -1.0;
+
     // The factor's linearisation point for this variable (linearise_at_belief_ mode only)
     typename VariableType::EstimateType lin_point_;
     bool has_lin_point_ = false;

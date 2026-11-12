@@ -27,6 +27,8 @@ namespace gsolver {
         .def("features", &S::features, nb::arg("update_state") = true, nb::call_guard<nb::gil_scoped_release>(),
              "All rule inputs (edges x len(feature_names)), stateful like rls_gbp's RuleFeatures")
         .def("probabilities", &S::probabilities, nb::arg("X"), nb::call_guard<nb::gil_scoped_release>())
+        .def("apply_damping", &S::applyDamping, nb::arg("X"), nb::call_guard<nb::gil_scoped_release>(),
+             "Set every edge's damping from the rule's damping head (no-op without one)")
         .def(
           "tick",
           [](S& s, const Eigen::VectorXd& uniforms) {
@@ -60,7 +62,12 @@ namespace gsolver {
         .def_rw("W1", &SendRule::W1)
         .def_rw("b1", &SendRule::b1)
         .def_rw("w2", &SendRule::w2)
-        .def_rw("b2", &SendRule::b2);
+        .def_rw("b2", &SendRule::b2)
+        .def_rw("has_damping", &SendRule::has_damping)
+        .def_rw("damping_features", &SendRule::damping_features)
+        .def_rw("damping_coef", &SendRule::damping_coef)
+        .def_rw("damping_intercept", &SendRule::damping_intercept)
+        .def_rw("damping_max", &SendRule::damping_max);
       bind_rule_scheduler_type<SE2Pose>(m, "RuleSchedulerSE2");
       bind_rule_scheduler_type<SE3Pose>(m, "RuleSchedulerSE3");
     }

@@ -49,6 +49,23 @@ namespace gsolver {
     Eigen::MatrixXd W1;
     double b2 = 0.0;
 
+    // Optional damping head: the share of the previous factor-to-variable message kept on the edge,
+    // d = damping_max * sigmoid(damping_intercept + damping_coef . x_d), x_d = the features in
+    // damping_features (indices into kFeatureNames). Without it the factors' damping applies.
+    bool has_damping = false;
+    std::vector<int> damping_features;
+    Eigen::VectorXd damping_coef;
+    double damping_intercept = 0.0;
+    double damping_max       = 0.9;
+
+    double damping(const Eigen::VectorXd& x_all) const {
+      double logit = damping_intercept;
+      for (size_t c = 0; c < damping_features.size(); ++c) {
+        logit += damping_coef[c] * x_all[damping_features[c]];
+      }
+      return damping_max / (1.0 + std::exp(-logit));
+    }
+
     double probability(const Eigen::VectorXd& x) const {
       double logit;
       if (W1.size() == 0) {
@@ -193,8 +210,23 @@ namespace gsolver {
 
     // One tick with the rule. uniforms: one U(0,1) draw per edge (edge sends iff u < p); empty to
     // draw them here. Returns the messages sent.
+    // Damping head of the rule on every edge (no-op without one). Rows of X as features().
+    void applyDamping(const Eigen::MatrixXd& X) {
+      if (!rule_.has_damping) {
+        return;
+      }
+      size_t row = 0;
+      for (auto& v : variables_) {
+        for (auto& e : v->edges_) {
+          e->damping_ = rule_.damping(X.row(row++).transpose());
+        }
+      }
+    }
+
     TickCounts tick(const Eigen::VectorXd& uniforms = Eigen::VectorXd()) {
-      const Eigen::VectorXd p = probabilities(features(true));
+      const Eigen::MatrixXd X = features(true);
+      applyDamping(X);
+      const Eigen::VectorXd p = probabilities(X);
       std::vector<std::vector<int>> masks(variables_.size());
       std::uniform_real_distribution<double> unit(0.0, 1.0);
       size_t row = 0;

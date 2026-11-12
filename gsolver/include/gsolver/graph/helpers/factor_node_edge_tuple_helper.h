@@ -94,7 +94,7 @@ namespace gsolver {
                     computeMessage<CurrentVariableType, out_offset_, a_size, b_size>(
                       etaExcluding<VariablesDim_, out_offset_, a_size>(factor_eta, incoming_eta), factor_Lambdaprime,
                       conditioned_Lambdaprime, outgoingPoint(at_lin_point)),
-                    update);
+                    update, current_edge_->damping_);
         return;
       }
       static const int next_out_offset = out_offset_ + CurrentVariableType::LieDim;
@@ -120,7 +120,7 @@ namespace gsolver {
                                          computeMessage<CurrentVariableType, out_offset_, a_size, b_size>(
                                            etaExcluding<VariablesDim_, out_offset_, a_size>(factor_eta, incoming_eta),
                                            factor_Lambdaprime, conditioned_Lambdaprime, outgoingPoint(at_lin_point)),
-                                         update);
+                                         update, current_edge_->damping_);
       // Send messages to the rest of the variable nodes
       return stored + RestFactorEdgeTuple::template sendAllMessages<VariablesDim_, next_out_offset>(
                         factor_eta, factor_Lambdaprime, conditioned_Lambdaprime, update, incoming_eta, at_lin_point);
@@ -296,7 +296,7 @@ namespace gsolver {
                     computeMessage<CurrentVariableType, out_offset_, a_size, b_size>(
                       etaExcluding<VariablesDim_, out_offset_, a_size>(factor_eta, incoming_eta), factor_Lambdaprime,
                       conditioned_Lambdaprime, outgoingPoint(at_lin_point)),
-                    update);
+                    update, current_edge_->damping_);
         return;
       }
       throw std::runtime_error("variable id not found");
@@ -318,7 +318,7 @@ namespace gsolver {
                           computeMessage<CurrentVariableType, out_offset_, a_size, b_size>(
                             etaExcluding<VariablesDim_, out_offset_, a_size>(factor_eta, incoming_eta), factor_Lambdaprime,
                             conditioned_Lambdaprime, outgoingPoint(at_lin_point)),
-                          update);
+                          update, current_edge_->damping_);
     }
 
     bool hasUnprocessedMessage() const {

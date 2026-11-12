@@ -223,3 +223,24 @@ TEST(BeliefMessages, EqualPerEdgeMessages) {
     }
   }
 }
+
+TEST(EdgeDamping, SameAsFactorDamping) {
+  // Damping set on every edge (as a scheduler does) equals the same damping set on the factors
+  Loop a, b;
+  buildLoop(a, 8, 7);
+  buildLoop(b, 8, 7);
+  for (auto& f : a.graph.factor_nodes_) {
+    f->message_update_.damping = 0.4;
+  }
+  for (auto& v : b.graph.variable_nodes_) {
+    auto p = std::dynamic_pointer_cast<SE2Pose>(v);
+    for (auto& e : p->edges_) {
+      e->damping_ = 0.4;
+    }
+  }
+  for (int it = 0; it < 40; ++it) {
+    incrementalTick(a.graph);
+    incrementalTick(b.graph);
+    ASSERT_LT(maxDifference(a, b), 1e-12) << "iteration " << it;
+  }
+}
