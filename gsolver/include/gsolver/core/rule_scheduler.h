@@ -23,6 +23,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <limits>
 #include <stdexcept>
 #include <memory>
 #include <random>
@@ -81,6 +82,44 @@ namespace gsolver {
     }
   };
 
+  // Inputs of the factor rule, per factor-variable edge (f, j), all local to the factor:
+  //   reply to j:   ticks since f last replied to j; "news for j" = how far the OTHER variables'
+  //                 messages moved since that reply (sum, each in its message's standard deviations);
+  //                 whether j sent this tick; f's Mahalanobis distance sqrt(2E) (its own sigmas);
+  //                 f's energy trend; f's energy relative to its energy at the last reply to j
+  //   damping of the new message from j: oscillation of j's incoming message (cosine of its last two
+  //                 changes); its change in standard deviations; ticks since j's previous message
+  inline const std::vector<std::string> kFactorFeatureNames = {
+    "f_log1p_reply_staleness", "f_log_news", "f_target_sent", "f_log_mahalanobis", "f_energy_trend",
+    "f_log_energy_since_reply", "f_incoming_oscillation", "f_log_incoming_change", "f_log1p_incoming_gap"};
+
+  // Logistic head over a subset of inputs: out = scale * sigmoid(intercept + coef . x_subset)
+  struct LogisticHead {
+    bool active = false;
+    std::vector<int> features;
+    Eigen::VectorXd coef;
+    double intercept = 0.0;
+    double scale     = 1.0;
+    double operator()(const Eigen::VectorXd& x_all) const {
+      double logit = intercept;
+      for (size_t c = 0; c < features.size(); ++c) {
+        logit += coef[c] * x_all[features[c]];
+      }
+      return scale / (1.0 + std::exp(-logit));
+    }
+  };
+
+  // The factor's rule: whether to reply on each edge (probability, sampled) and how much to damp
+  // each new incoming message (fraction of the previous one kept). Inactive heads: always reply,
+  // no incoming damping.
+  struct FactorRule {
+    LogisticHead reply;
+    LogisticHead damping;
+    bool active() const {
+      return reply.active || damping.active;
+    }
+  };
+
   struct TickCounts {
     size_t variable_to_factor = 0;
     size_t factor_to_variable = 0;
@@ -90,6 +129,7 @@ namespace gsolver {
   class RuleScheduler {
   public:
     using EstimateType = typename VariableType::EstimateType;
+    using VectorLieDim = typename VariableType::VectorLieDim;
 
     RuleScheduler(FactorGraph& graph, SendRule rule, unsigned seed)
       : graph_(graph), rule_(std::move(rule)), rng_(seed) {
@@ -108,8 +148,27 @@ namespace gsolver {
         }
         edge_factor_.push_back(fs);
       }
+      // Each factor's edges, as (variable, edge index), in variable order
+      factor_edges_.assign(graph_.factor_nodes_.size(), {});
+      for (size_t i = 0; i < variables_.size(); ++i) {
+        for (size_t j = 0; j < variables_[i]->edges_.size(); ++j) {
+          factor_edges_[edge_factor_[i][j]].push_back({i, j});
+        }
+      }
       reset();
     }
+
+    void setFactorRule(FactorRule rule) {
+      factor_rule_ = std::move(rule);
+    }
+
+    // Inputs of the factor rule at its last decision (rows: factors in graph order, then their edges)
+    const Eigen::MatrixXd& lastFactorFeatures() const {
+      return last_factor_features_;
+    }
+
+    // Record factor-rule inputs every tick even without an active factor rule (for statistics)
+    bool record_factor_features_ = false;
 
     // Episode start: nothing sent yet (staleness 0, last-sent pose = current belief)
     void reset() {
@@ -123,6 +182,37 @@ namespace gsolver {
       prev_energy_.clear();
       start_std_.clear();
       prev_std_.clear();
+      const size_t nf = graph_.factor_nodes_.size();
+      f_energy_prev_.assign(nf, -1.0);
+      f_reply_tick_.assign(nf, {});
+      f_energy_reply_.assign(nf, {});
+      f_news_snap_.assign(nf, {});
+      f_inc_prev_.assign(nf, {});
+      f_inc_delta_.assign(nf, {});
+      f_inc_has_delta_.assign(nf, {});
+      f_inc_cos_.assign(nf, {});
+      for (size_t f = 0; f < nf; ++f) {
+        const size_t k = factor_edges_[f].size();
+        f_reply_tick_[f].assign(k, 0);
+        f_energy_reply_[f].assign(k, -1.0);
+        f_news_snap_[f].assign(k, std::vector<EstimateType>(k));
+        f_inc_prev_[f].resize(k);
+        f_inc_delta_[f].assign(k, VectorLieDim::Zero());
+        f_inc_has_delta_[f].assign(k, 0);
+        f_inc_cos_[f].assign(k, 0.0);
+        for (size_t p = 0; p < k; ++p) {
+          const auto& [vi, ej]  = factor_edges_[f][p];
+          f_inc_prev_[f][p]     = variables_[vi]->edges_[ej]->variable_to_factor_message_.mu_;
+          for (size_t q = 0; q < k; ++q) {
+            const auto& [vq, eq] = factor_edges_[f][q];
+            f_news_snap_[f][p][q] = variables_[vq]->edges_[eq]->variable_to_factor_message_.mu_;
+          }
+        }
+      }
+      inc_gap_.assign(variables_.size(), {});
+      for (size_t i = 0; i < variables_.size(); ++i) {
+        inc_gap_[i].assign(variables_[i]->edges_.size(), 0);
+      }
       osc_prev_msg_.assign(variables_.size(), {});
       osc_prev_delta_.assign(variables_.size(), {});
       osc_has_msg_.assign(variables_.size(), {});
@@ -288,6 +378,7 @@ namespace gsolver {
         const EstimateType before = v->mu_;
         for (size_t j = 0; j < masks[i].size(); ++j) {
           if (masks[i][j]) {
+            inc_gap_[i][j]        = ticks_ - last_sent_tick_[i][j];
             last_sent_tick_[i][j] = ticks_;
             last_sent_pose_[i][j] = before;
             ++counts.variable_to_factor;
@@ -296,9 +387,13 @@ namespace gsolver {
         v->sendMessages(masks[i]); // with send_belief_: one belief for all selected edges
         v->markMessagesProcessed();
       }
-      for (auto& f : graph_.factor_nodes_) {
-        f->updateFactorIfNew();
-        counts.factor_to_variable += f->sendAllMessagesIfNew();
+      if (factor_rule_.active() || record_factor_features_) {
+        counts.factor_to_variable += factorStage();
+      } else {
+        for (auto& f : graph_.factor_nodes_) {
+          f->updateFactorIfNew();
+          counts.factor_to_variable += f->sendAllMessagesIfNew();
+        }
       }
       for (auto& v : variables_) {
         v->updateMuAndSigma();
@@ -308,6 +403,114 @@ namespace gsolver {
 
     long ticks() const {
       return ticks_;
+    }
+
+    // The factors' part of a tick with the factor rule: inputs, damping of new incoming messages,
+    // relinearisation, which pending replies to send. Returns the replies sent.
+    size_t factorStage() {
+      constexpr double kEps = 1e-9;
+      const size_t n_features = kFactorFeatureNames.size();
+      size_t rows = 0;
+      for (auto& fe : factor_edges_) {
+        rows += fe.size();
+      }
+      last_factor_features_.resize(rows, n_features);
+      std::uniform_real_distribution<double> unit(0.0, 1.0);
+      size_t replies = 0, row0 = 0;
+      for (size_t f = 0; f < graph_.factor_nodes_.size(); ++f) {
+        auto& factor  = graph_.factor_nodes_[f];
+        const auto& fe = factor_edges_[f];
+        const size_t k = fe.size();
+        auto edge = [&](size_t p) -> auto& { return *variables_[fe[p].first]->edges_[fe[p].second]; };
+        auto msg_std = [&](size_t p) {
+          const auto& L = edge(p).variable_to_factor_message_.Lambda_;
+          return L.isZero(0.0) ? std::numeric_limits<double>::infinity() : std::sqrt(std::max(L.inverse().trace(), kEps));
+        };
+        // Inputs about the new incoming messages (before damping)
+        std::vector<char> fresh(k);
+        for (size_t p = 0; p < k; ++p) {
+          auto& e      = edge(p);
+          fresh[p]     = !e.variable_to_factor_message_.processed_;
+          double change = 0.0, cos = f_inc_cos_[f][p];
+          if (fresh[p]) {
+            const VectorLieDim delta = VariableType::boxminus(f_inc_prev_[f][p], e.variable_to_factor_message_.mu_);
+            const double sd           = msg_std(p);
+            change                    = std::isfinite(sd) ? delta.norm() / sd : 0.0;
+            if (delta.norm() > 1e-6) {
+              if (f_inc_has_delta_[f][p]) {
+                cos = delta.dot(f_inc_delta_[f][p]) / (delta.norm() * f_inc_delta_[f][p].norm());
+              }
+              f_inc_delta_[f][p]     = delta;
+              f_inc_has_delta_[f][p] = 1;
+              f_inc_cos_[f][p]       = cos;
+            }
+            f_inc_prev_[f][p] = e.variable_to_factor_message_.mu_;
+          }
+          const auto& [vi, ej]                       = fe[p];
+          last_factor_features_(row0 + p, 2)          = fresh[p] ? 1.0 : 0.0;
+          last_factor_features_(row0 + p, 6)          = cos;
+          last_factor_features_(row0 + p, 7)          = std::log(change + 1e-6);
+          last_factor_features_(row0 + p, 8)          = std::log1p(static_cast<double>(fresh[p] ? inc_gap_[vi][ej] : 0));
+        }
+        // Damping of the new incoming messages, then relinearise if something is new
+        if (factor_rule_.damping.active) {
+          for (size_t p = 0; p < k; ++p) {
+            if (fresh[p]) {
+              // the energy inputs are not known yet: use the previous tick's (rows filled below)
+              const double E_prev = f_energy_prev_[f] < 0 ? factor->energy() : f_energy_prev_[f];
+              last_factor_features_(row0 + p, 3) = std::log(std::sqrt(std::max(2.0 * E_prev, 0.0)) + 1e-6);
+              last_factor_features_(row0 + p, 4) = 0.0;
+              edge(p).v2f_damping_ = factor_rule_.damping(last_factor_features_.row(row0 + p).transpose());
+            }
+          }
+        }
+        factor->prepareIncoming();
+        factor->updateFactorIfNew();
+        // Inputs about the replies
+        const double E      = factor->energy();
+        const double E_prev = f_energy_prev_[f] < 0 ? E : f_energy_prev_[f];
+        const bool had_new  = factor->hasUnprocessedMessages();
+        std::vector<char> pending(k);
+        for (size_t p = 0; p < k; ++p) {
+          auto& e  = edge(p);
+          pending[p] = e.reply_pending_ || had_new;
+          double news = 0.0;
+          for (size_t q = 0; q < k; ++q) {
+            if (q == p) {
+              continue;
+            }
+            const double sd = msg_std(q);
+            if (std::isfinite(sd)) {
+              news += VariableType::boxminus(f_news_snap_[f][p][q], edge(q).variable_to_factor_message_.mu_).norm() / sd;
+            }
+          }
+          const double E_reply = f_energy_reply_[f][p] < 0 ? E : f_energy_reply_[f][p];
+          last_factor_features_(row0 + p, 0) = std::log1p(static_cast<double>(ticks_ - f_reply_tick_[f][p]));
+          last_factor_features_(row0 + p, 1) = std::log(news + 1e-6);
+          last_factor_features_(row0 + p, 3) = std::log(std::sqrt(std::max(2.0 * E, 0.0)) + 1e-6);
+          last_factor_features_(row0 + p, 4) = std::clamp(std::log((E + kEps) / (E_prev + kEps)), -5.0, 5.0);
+          last_factor_features_(row0 + p, 5) = std::log((E + kEps) / (E_reply + kEps));
+          int selected = 1;
+          if (factor_rule_.reply.active) {
+            selected = unit(rng_) < factor_rule_.reply(last_factor_features_.row(row0 + p).transpose()) ? 1 : 0;
+          }
+          e.reply_selected_ = selected;
+        }
+        replies += factor->sendRepliesIfPending();
+        // Bookkeeping for the replies that went out
+        for (size_t p = 0; p < k; ++p) {
+          if (pending[p] && edge(p).reply_selected_) {
+            f_reply_tick_[f][p]   = ticks_;
+            f_energy_reply_[f][p] = E;
+            for (size_t q = 0; q < k; ++q) {
+              f_news_snap_[f][p][q] = edge(q).variable_to_factor_message_.mu_;
+            }
+          }
+        }
+        f_energy_prev_[f] = E;
+        row0 += k;
+      }
+      return replies;
     }
 
   private:
@@ -321,8 +524,18 @@ namespace gsolver {
     std::vector<std::vector<long>> last_sent_tick_;
     std::vector<std::vector<EstimateType>> last_sent_pose_;
     std::vector<double> prev_energy_, start_std_, prev_std_;
+    // factor rule
+    FactorRule factor_rule_;
+    std::vector<std::vector<std::pair<size_t, size_t>>> factor_edges_;
+    Eigen::MatrixXd last_factor_features_;
+    std::vector<double> f_energy_prev_;
+    std::vector<std::vector<long>> f_reply_tick_, inc_gap_;
+    std::vector<std::vector<double>> f_energy_reply_, f_inc_cos_;
+    std::vector<std::vector<std::vector<EstimateType>>> f_news_snap_;
+    std::vector<std::vector<EstimateType>> f_inc_prev_;
+    std::vector<std::vector<VectorLieDim>> f_inc_delta_;
+    std::vector<std::vector<char>> f_inc_has_delta_;
     // edge_oscillation state per edge: last message seen, its last change, the last cosine
-    using VectorLieDim = typename VariableType::VectorLieDim;
     std::vector<std::vector<EstimateType>> osc_prev_msg_;
     std::vector<std::vector<VectorLieDim>> osc_prev_delta_;
     std::vector<std::vector<char>> osc_has_msg_, osc_has_delta_;

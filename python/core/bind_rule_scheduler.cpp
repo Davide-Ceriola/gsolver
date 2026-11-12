@@ -46,12 +46,29 @@ namespace gsolver {
             return std::make_pair(c.variable_to_factor, c.factor_to_variable);
           },
           nb::arg("masks"), "One tick with given decisions (per variable, per edge). Returns (#v2f, #f2v)")
+        .def("set_factor_rule", &S::setFactorRule, nb::arg("rule"), "Factor rule (reply / incoming damping heads)")
+        .def("last_factor_features", [](const S& s) { return Eigen::MatrixXd(s.lastFactorFeatures()); },
+             "Factor-rule inputs at the last tick (rows: factors in graph order, then their edges)")
+        .def_rw("record_factor_features", &S::record_factor_features_,
+                "Compute the factor-rule inputs every tick even without an active factor rule")
         .def_prop_ro("ticks", &S::ticks)
         .def_prop_ro("num_edges", &S::numberOfEdges);
     }
 
     void bind_rule_scheduler(nb::module_& m) {
       m.attr("RULE_FEATURE_NAMES") = kFeatureNames;
+      m.attr("FACTOR_FEATURE_NAMES") = kFactorFeatureNames;
+      nb::class_<LogisticHead>(m, "LogisticHead", "out = scale * sigmoid(intercept + coef . x[features])")
+        .def(nb::init<>())
+        .def_rw("active", &LogisticHead::active)
+        .def_rw("features", &LogisticHead::features)
+        .def_rw("coef", &LogisticHead::coef)
+        .def_rw("intercept", &LogisticHead::intercept)
+        .def_rw("scale", &LogisticHead::scale);
+      nb::class_<FactorRule>(m, "FactorRule", "Factor rule: reply head (probability) and incoming damping head")
+        .def(nb::init<>())
+        .def_rw("reply", &FactorRule::reply)
+        .def_rw("damping", &FactorRule::damping);
       nb::class_<SendRule>(m, "SendRule", "Logistic (coef, intercept) or MLP (mu, sd, W1, b1, w2, b2) send rule")
         .def(nb::init<>())
         .def_rw("features", &SendRule::features, "Indices into RULE_FEATURE_NAMES")
