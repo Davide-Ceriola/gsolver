@@ -16,6 +16,9 @@
 //   energy e_f; mean over v's factors; e_f at the previous tick
 //   std        = sqrt(trace Sigma_v); std at the first tick and at the previous tick
 //   disagreement = ||log(T_v^-1 mu_msg)||, msg_std = sqrt(trace Lambda_msg^-1)
+//   edge_oscillation = cosine between the last two changes of the factor-to-variable message on
+//                      the edge (tangent space): ~ -1 when it bounces back and forth, ~ +1 when it
+//                      keeps moving one way, 0 before two changes (kept between changes)
 // The rule sees the subset given by `features` (indices into kFeatureNames).
 
 #include <algorithm>
@@ -37,7 +40,7 @@ namespace gsolver {
     "log_residual",          "log1p_staleness",       "log_energy",          "log_relative_energy",
     "energy_trend",          "log_uncertainty",       "log_residual_over_std", "degree",
     "log_disagreement",      "log_message_std",       "log_relative_residual", "log_std_progress",
-    "log_std_trend",         "log_relative_message_std", "log_normalised_disagreement"};
+    "log_std_trend",         "log_relative_message_std", "log_normalised_disagreement", "edge_oscillation"};
 
   struct SendRule {
     std::vector<int> features; // indices into kFeatureNames
@@ -120,6 +123,19 @@ namespace gsolver {
       prev_energy_.clear();
       start_std_.clear();
       prev_std_.clear();
+      osc_prev_msg_.assign(variables_.size(), {});
+      osc_prev_delta_.assign(variables_.size(), {});
+      osc_has_msg_.assign(variables_.size(), {});
+      osc_has_delta_.assign(variables_.size(), {});
+      osc_cos_.assign(variables_.size(), {});
+      for (size_t i = 0; i < variables_.size(); ++i) {
+        const size_t k = variables_[i]->edges_.size();
+        osc_prev_msg_[i].resize(k);
+        osc_prev_delta_[i].assign(k, VectorLieDim::Zero());
+        osc_has_msg_[i].assign(k, 0);
+        osc_has_delta_[i].assign(k, 0);
+        osc_cos_[i].assign(k, 0.0);
+      }
     }
 
     size_t numberOfEdges() const {
@@ -183,6 +199,27 @@ namespace gsolver {
           X(row, 12) = std::clamp(std::log(sd / prev_sd), -5.0, 5.0);
           X(row, 13) = std::log(msg_std[j] / geo_msg_std);
           X(row, 14) = std::log(disagreement / std::sqrt(sd * sd + msg_std[j] * msg_std[j]) + 1e-6);
+          // Oscillation of the incoming message on this edge
+          const auto& msg_mu = v->edges_[j]->factor_to_variable_message_.mu_;
+          double cos = osc_cos_[i][j];
+          if (osc_has_msg_[i][j]) {
+            const VectorLieDim delta = VariableType::boxminus(osc_prev_msg_[i][j], msg_mu);
+            if (delta.norm() > 1e-6) { // smaller changes are numerical noise
+              if (osc_has_delta_[i][j]) {
+                cos = delta.dot(osc_prev_delta_[i][j]) / (delta.norm() * osc_prev_delta_[i][j].norm());
+              }
+              if (update_state) {
+                osc_prev_delta_[i][j] = delta;
+                osc_has_delta_[i][j]  = 1;
+                osc_cos_[i][j]        = cos;
+              }
+            }
+          }
+          if (update_state) {
+            osc_prev_msg_[i][j] = msg_mu;
+            osc_has_msg_[i][j]  = 1;
+          }
+          X(row, 15) = cos;
         }
       }
       if (update_state) {
@@ -284,6 +321,12 @@ namespace gsolver {
     std::vector<std::vector<long>> last_sent_tick_;
     std::vector<std::vector<EstimateType>> last_sent_pose_;
     std::vector<double> prev_energy_, start_std_, prev_std_;
+    // edge_oscillation state per edge: last message seen, its last change, the last cosine
+    using VectorLieDim = typename VariableType::VectorLieDim;
+    std::vector<std::vector<EstimateType>> osc_prev_msg_;
+    std::vector<std::vector<VectorLieDim>> osc_prev_delta_;
+    std::vector<std::vector<char>> osc_has_msg_, osc_has_delta_;
+    std::vector<std::vector<double>> osc_cos_;
   };
 
 } // namespace gsolver
