@@ -252,6 +252,7 @@ TEST(GenericScheduler, WeightedCountsAndStalenessCap) {
   }
   GenericScheduler sa(a.graph, vr, fr, 5);
   sa.setEdgeWeights(std::vector<double>(sa.numberOfEdges(), 1.0));
+  ASSERT_EQ(sa.variableFeatures(false).cols(), static_cast<long>(kVariableInputNamesV4.size()));
   for (int it = 0; it < 20; ++it) {
     const TickCounts c = sa.tick();
     const auto w       = sa.weightedCounts();
@@ -269,6 +270,12 @@ TEST(GenericScheduler, WeightedCountsAndStalenessCap) {
     w[r] = 1.0;
   }
   sb.setEdgeWeights(w);
+  {
+    const Eigen::MatrixXd X = sb.variableFeatures(false);
+    for (size_t r = 0; r < w.size(); ++r) {
+      ASSERT_EQ(X(r, X.cols() - 1), w[r]) << "edge cost input, row " << r;
+    }
+  }
   for (int it = 0; it < 30; ++it) {
     const TickCounts c = sb.tick();
     // the never-sending rule sends only through the cap: every edge after 5 silent ticks

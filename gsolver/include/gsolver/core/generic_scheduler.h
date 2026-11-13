@@ -38,7 +38,9 @@ namespace gsolver {
 
   inline const std::vector<std::string> kVariableInputNamesV4 = {
     "v_log1p_staleness",     "v_log_moved",   "v_log_relative_moved", "v_uncertainty_trend", "v_log_relative_energy",
-    "v_energy_trend",        "v_log_message_share", "v_log_disagreement", "v_oscillation"};
+    "v_energy_trend",        "v_log_message_share", "v_log_disagreement", "v_oscillation",
+    // the edge's message cost (setEdgeWeights; 1 without weights): e.g. 1 between robots, 0 inside one
+    "v_edge_cost"};
 
   inline const std::vector<std::string> kFactorInputNamesV4 = {
     "f_log1p_reply_staleness", "f_log_news",          "f_target_sent",       "f_log_mahalanobis", "f_energy_trend",
@@ -125,7 +127,7 @@ namespace gsolver {
 
     // Variable rule inputs for every edge (variables in graph order, edges in variable order)
     Eigen::MatrixXd variableFeatures(bool update) {
-      const int n = VariableNodeBase::kRuleInputs;
+      const int n = VariableNodeBase::kRuleInputs + 1; // the variable's inputs, then the edge cost
       Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor> X(numberOfEdges(), n);
       std::vector<double> energy(graph_.factor_nodes_.size());
       for (size_t f = 0; f < energy.size(); ++f) {
@@ -142,6 +144,9 @@ namespace gsolver {
         }
         if (k) {
           v->ruleInputs(ticks_, edge_energy.data(), X.data() + row * n, n, update);
+        }
+        for (size_t j = 0; j < k; ++j) {
+          X(row + j, n - 1) = weight(row + j);
         }
         row += k;
       }
