@@ -241,6 +241,15 @@ TEST(GenericScheduler, WeightedCountsAndStalenessCap) {
   fr.reply = someHead(9, 21);
   VariableRule vr;
   vr.send = someHead(VariableNodeBase::kRuleInputs, 22);
+  // without a factor rule (every factor with news replies to all its variables) and with one
+  ScaledLoop c;
+  buildScaledLoop(c, 8, 3, 1.0);
+  GenericScheduler sc(c.graph, vr, {}, 5);
+  sc.setEdgeWeights(std::vector<double>(sc.numberOfEdges(), 1.0));
+  for (int it = 0; it < 20; ++it) {
+    const TickCounts cc = sc.tick();
+    ASSERT_DOUBLE_EQ(sc.weightedCounts().second, static_cast<double>(cc.factor_to_variable)) << "tick " << it;
+  }
   GenericScheduler sa(a.graph, vr, fr, 5);
   sa.setEdgeWeights(std::vector<double>(sa.numberOfEdges(), 1.0));
   for (int it = 0; it < 20; ++it) {

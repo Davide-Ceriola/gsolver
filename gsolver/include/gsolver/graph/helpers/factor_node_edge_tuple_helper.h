@@ -386,11 +386,13 @@ namespace gsolver {
       static const int a_size     = CurrentVariableType::LieDim; // Size of the outgoing edge
       static const int b_size     = total_size - a_size;         // Size of the remaining edges
       // Send the message to the variable node
-      return storeMessage(current_edge_->factor_to_variable_message_,
-                          computeMessage<CurrentVariableType, out_offset_, a_size, b_size>(
-                            etaExcluding<VariablesDim_, out_offset_, a_size>(factor_eta, incoming_eta), factor_Lambdaprime,
-                            conditioned_Lambdaprime, outgoingPoint(at_lin_point)),
-                          update, current_edge_->damping_);
+      const size_t stored = storeMessage(current_edge_->factor_to_variable_message_,
+                                         computeMessage<CurrentVariableType, out_offset_, a_size, b_size>(
+                                           etaExcluding<VariablesDim_, out_offset_, a_size>(factor_eta, incoming_eta),
+                                           factor_Lambdaprime, conditioned_Lambdaprime, outgoingPoint(at_lin_point)),
+                                         update, current_edge_->damping_);
+      current_edge_->f2v_sent_ += stored;
+      return stored;
     }
 
     bool hasUnprocessedMessage() const {

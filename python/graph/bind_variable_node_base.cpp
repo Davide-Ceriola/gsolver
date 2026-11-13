@@ -49,7 +49,17 @@ namespace gsolver {
         .def("mark_messages_processed",
              &VariableNodeBase::markMessagesProcessed,
              "Mark every incoming factor-to-variable message processed")
-        .def_prop_ro("num_edges", &VariableNodeBase::numberOfEdges, "Number of connected factors");
+        .def_prop_ro("num_edges", &VariableNodeBase::numberOfEdges, "Number of connected factors")
+        .def_prop_ro(
+          "edge_factor_ids",
+          [](VariableNodeBase& v) {
+            std::vector<std::string> ids;
+            for (size_t j = 0; j < v.numberOfEdges(); ++j) {
+              ids.push_back(v.getEdgeAt(j)->factor_id_);
+            }
+            return ids;
+          },
+          "IDs of the connected factors, in edge order");
     }
 
   } // namespace python
