@@ -229,3 +229,43 @@ TEST(GenericScheduler, MixedVariableTypes) {
   auto p = std::dynamic_pointer_cast<SE3Point>(g.variable_nodes_[2]);
   EXPECT_LT((p->mu_ - points[0]).norm(), 0.5);
 }
+
+TEST(GenericScheduler, WeightedCountsAndStalenessCap) {
+  // Unit weights: the weighted counts are the message counts; zero weights on half the edges: the
+  // cost of the others. A rule that never sends, capped at 5 silent ticks: every edge sends at
+  // least once every 5 ticks.
+  ScaledLoop a, b;
+  buildScaledLoop(a, 8, 3, 1.0);
+  buildScaledLoop(b, 8, 3, 1.0);
+  FactorRule fr;
+  fr.reply = someHead(9, 21);
+  VariableRule vr;
+  vr.send = someHead(VariableNodeBase::kRuleInputs, 22);
+  GenericScheduler sa(a.graph, vr, fr, 5);
+  sa.setEdgeWeights(std::vector<double>(sa.numberOfEdges(), 1.0));
+  for (int it = 0; it < 20; ++it) {
+    const TickCounts c = sa.tick();
+    const auto w       = sa.weightedCounts();
+    ASSERT_DOUBLE_EQ(w.first, static_cast<double>(c.variable_to_factor)) << "tick " << it;
+    ASSERT_DOUBLE_EQ(w.second, static_cast<double>(c.factor_to_variable)) << "tick " << it;
+  }
+  EXPECT_THROW(sa.setEdgeWeights(std::vector<double>(3, 1.0)), std::invalid_argument);
+
+  VariableRule silent;
+  silent.send        = constantHead(-40.0);
+  silent.max_silence = 5;
+  GenericScheduler sb(b.graph, silent, {}, 6);
+  std::vector<double> w(sb.numberOfEdges(), 0.0);
+  for (size_t r = 0; r < w.size(); r += 2) {
+    w[r] = 1.0;
+  }
+  sb.setEdgeWeights(w);
+  for (int it = 0; it < 30; ++it) {
+    const TickCounts c = sb.tick();
+    // the never-sending rule sends only through the cap: every edge after 5 silent ticks
+    // (ticks 0-4 silent, send at 5; 6-10 silent, send at 11; ...)
+    const size_t expected = it >= 5 && (it - 5) % 6 == 0 ? sb.numberOfEdges() : 0;
+    ASSERT_EQ(c.variable_to_factor, expected) << "tick " << it;
+    ASSERT_DOUBLE_EQ(sb.weightedCounts().first, expected ? std::ceil(w.size() / 2.0) : 0.0) << "tick " << it;
+  }
+}

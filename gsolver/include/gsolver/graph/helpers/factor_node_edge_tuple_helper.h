@@ -90,11 +90,14 @@ namespace gsolver {
         static const int a_size     = CurrentVariableType::LieDim; // Size of the outgoing edge
         static const int b_size     = total_size - a_size;         // Size of the remaining edges
         // Send the message to the variable node
-        storeMessage(current_edge_->factor_to_variable_message_,
-                    computeMessage<CurrentVariableType, out_offset_, a_size, b_size>(
-                      etaExcluding<VariablesDim_, out_offset_, a_size>(factor_eta, incoming_eta), factor_Lambdaprime,
-                      conditioned_Lambdaprime, outgoingPoint(at_lin_point)),
-                    update, current_edge_->damping_);
+        current_edge_->f2v_sent_ +=
+          storeMessage(current_edge_->factor_to_variable_message_,
+                       computeMessage<CurrentVariableType, out_offset_, a_size, b_size>(
+                         etaExcluding<VariablesDim_, out_offset_, a_size>(factor_eta, incoming_eta), factor_Lambdaprime,
+                         conditioned_Lambdaprime, outgoingPoint(at_lin_point)),
+                       update, current_edge_->damping_)
+            ? 1
+            : 0;
         return;
       }
       static const int next_out_offset = out_offset_ + CurrentVariableType::LieDim;
@@ -121,6 +124,7 @@ namespace gsolver {
                                            etaExcluding<VariablesDim_, out_offset_, a_size>(factor_eta, incoming_eta),
                                            factor_Lambdaprime, conditioned_Lambdaprime, outgoingPoint(at_lin_point)),
                                          update, current_edge_->damping_);
+      current_edge_->f2v_sent_ += stored;
       // Send messages to the rest of the variable nodes
       return stored + RestFactorEdgeTuple::template sendAllMessages<VariablesDim_, next_out_offset>(
                         factor_eta, factor_Lambdaprime, conditioned_Lambdaprime, update, incoming_eta, at_lin_point);
@@ -247,6 +251,7 @@ namespace gsolver {
                                            factor_Lambdaprime, conditioned_Lambdaprime, outgoingPoint(at_lin_point)),
                                          update, current_edge_->damping_);
       current_edge_->reply_pending_ = false;
+      current_edge_->f2v_sent_ += stored;
       return stored;
     }
 
@@ -356,11 +361,14 @@ namespace gsolver {
         static const int a_size     = CurrentVariableType::LieDim; // Size of the outgoing edge
         static const int b_size     = total_size - a_size;         // Size of the remaining edges
         // Send the message to the variable node
-        storeMessage(current_edge_->factor_to_variable_message_,
-                    computeMessage<CurrentVariableType, out_offset_, a_size, b_size>(
-                      etaExcluding<VariablesDim_, out_offset_, a_size>(factor_eta, incoming_eta), factor_Lambdaprime,
-                      conditioned_Lambdaprime, outgoingPoint(at_lin_point)),
-                    update, current_edge_->damping_);
+        current_edge_->f2v_sent_ +=
+          storeMessage(current_edge_->factor_to_variable_message_,
+                       computeMessage<CurrentVariableType, out_offset_, a_size, b_size>(
+                         etaExcluding<VariablesDim_, out_offset_, a_size>(factor_eta, incoming_eta), factor_Lambdaprime,
+                         conditioned_Lambdaprime, outgoingPoint(at_lin_point)),
+                       update, current_edge_->damping_)
+            ? 1
+            : 0;
         return;
       }
       throw std::runtime_error("variable id not found");
@@ -502,6 +510,7 @@ namespace gsolver {
                                            factor_Lambdaprime, conditioned_Lambdaprime, outgoingPoint(at_lin_point)),
                                          update, current_edge_->damping_);
       current_edge_->reply_pending_ = false;
+      current_edge_->f2v_sent_ += stored;
       return stored;
     }
 

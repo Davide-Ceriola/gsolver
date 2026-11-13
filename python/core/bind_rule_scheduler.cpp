@@ -93,7 +93,8 @@ namespace gsolver {
         .def(nb::init<>())
         .def_rw("send", &VariableRule::send)
         .def_rw("damping", &VariableRule::damping)
-        .def_rw("fixed_send", &VariableRule::fixed_send);
+        .def_rw("fixed_send", &VariableRule::fixed_send)
+        .def_rw("max_silence", &VariableRule::max_silence);
       using G = GenericScheduler;
       nb::class_<G>(m, "GenericScheduler", "Learned local rules on any factor graph (core/generic_scheduler.h)")
         .def(nb::init<FactorGraph&, VariableRule, FactorRule, unsigned>(), nb::arg("graph"), nb::arg("variable_rule"),
@@ -120,7 +121,10 @@ namespace gsolver {
         .def("last_factor_features", [](const G& s) { return Eigen::MatrixXd(s.lastFactorFeatures()); })
         .def_rw("record_factor_features", &G::record_factor_features_)
         .def_prop_ro("ticks", &G::ticks)
-        .def_prop_ro("num_edges", &G::numberOfEdges);
+        .def_prop_ro("num_edges", &G::numberOfEdges)
+        .def("set_edge_weights", &G::setEdgeWeights, nb::arg("weights"),
+             "Per-edge message costs, one per (variable, edge) row; [] = 1 each")
+        .def("weighted_counts", &G::weightedCounts, "Cost of the last tick's messages: (v2f, f2v)");
 
       bind_rule_scheduler_type<SE2Pose>(m, "RuleSchedulerSE2");
       bind_rule_scheduler_type<SE3Pose>(m, "RuleSchedulerSE3");

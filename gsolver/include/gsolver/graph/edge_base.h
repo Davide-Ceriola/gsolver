@@ -31,6 +31,9 @@ namespace gsolver {
     // information for this variable it has not sent yet / may reply on this edge now
     bool reply_pending_ = false;
     int reply_selected_ = 1;
+    // Factor-to-variable messages stored on this edge so far (counted by the factor; read by
+    // GenericScheduler for per-edge message costs)
+    size_t f2v_sent_ = 0;
     // Damping of the incoming variable-to-factor message, applied by the factor (negative: none)
     double v2f_damping_ = -1.0;
     // Ticks between the variable's last two messages on this edge (recorded by the variable)
