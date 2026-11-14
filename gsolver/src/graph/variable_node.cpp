@@ -327,6 +327,14 @@ namespace gsolver {
     std::vector<double> moved(k), share(k);
     double mean_moved = 0.0, mean_energy = 0.0;
     for (size_t j = 0; j < k; ++j) {
+      // an edge added after ruleReset (graphs that grow): it starts now, as if it had just sent
+      if (!edges_[j]->has_last_sent_) {
+        edges_[j]->last_sent_mu_   = mu_;
+        edges_[j]->last_sent_tick_ = tick;
+        edges_[j]->has_last_sent_  = true;
+      }
+    }
+    for (size_t j = 0; j < k; ++j) {
       const VectorLieDim dm = V::boxminus(edges_[j]->last_sent_mu_, mu_);
       moved[j]              = std::sqrt(std::max(dm.dot(Lb * dm), 0.0) / d);
       mean_moved += moved[j];
