@@ -112,6 +112,16 @@ namespace gsolver {
       stored = fresh;
       return true;
     }
+    if (update.damp_eta_only) {
+      // In the tangent space at the fresh mean: eta_fresh = 0, eta_stored = Lambda_stored delta;
+      // eta = damping eta_stored, Lambda = Lambda_fresh, mean = Lambda_fresh^-1 eta
+      const auto delta = VariableType::boxminus(fresh.mu_, stored.mu_);
+      const auto eta   = (damping * (stored.Lambda_ * delta)).eval();
+      stored.mu_        = VariableType::boxplus(fresh.mu_, fresh.Lambda_.ldlt().solve(eta));
+      stored.Lambda_    = fresh.Lambda_;
+      stored.processed_ = false;
+      return true;
+    }
     MatrixLieDim Lambda  = (1.0 - damping) * fresh.Lambda_ + damping * stored.Lambda_;
     symmetrize(Lambda);
     stored.mu_        = VariableType::boxplus(fresh.mu_, damping * VariableType::boxminus(fresh.mu_, stored.mu_));

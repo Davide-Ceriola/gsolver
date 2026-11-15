@@ -19,6 +19,9 @@ namespace gsolver {
   public:
     double damping = 0.0;
     double dropout = 0.0;
+    // Damp only the information vector (the precision is taken new), as in Ortiz et al.'s GBP;
+    // default: both precision and mean are mixed
+    bool damp_eta_only = false;
 
     void prepare(const std::string& node_id) {
       if (dropout > 0.0 && !seeded_) {

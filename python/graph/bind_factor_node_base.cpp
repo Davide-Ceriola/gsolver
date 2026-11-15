@@ -41,6 +41,11 @@ namespace gsolver {
           [](FactorNodeBase& f, double d) { f.message_update_.damping = d; },
           "Share of the previous factor-to-variable message each new one keeps (0: none)")
         .def_prop_rw(
+          "damp_eta_only",
+          [](const FactorNodeBase& f) { return f.message_update_.damp_eta_only; },
+          [](FactorNodeBase& f, bool b) { f.message_update_.damp_eta_only = b; },
+          "Damp only the information vector of the factor-to-variable messages (precision taken new)")
+        .def_prop_rw(
           "dropout",
           [](const FactorNodeBase& f) { return f.message_update_.dropout; },
           [](FactorNodeBase& f, double d) { f.message_update_.dropout = d; },
