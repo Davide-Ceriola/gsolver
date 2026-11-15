@@ -60,6 +60,11 @@ namespace gsolver {
     bool v_osc_has_prev_ = false, v_osc_has_delta_ = false;
     double v_osc_cos_    = 0.0;
     double prev_energy_  = -1.0;
+    // memory over many ticks (exponential averages): the edge's usual change, and the direction and
+    // size of its energy changes (settling: steadily down; oscillating: up and down)
+    double hist_moved_ema_     = -1.0; // negative: no history yet
+    double hist_trend_ema_     = 0.0;
+    double hist_trend_abs_ema_ = 0.0;
     // factor side
     EstimateT f_inc_prev_;
     VectorT f_inc_delta_ = VectorT::Zero();

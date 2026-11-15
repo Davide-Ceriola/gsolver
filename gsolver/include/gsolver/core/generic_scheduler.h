@@ -39,6 +39,9 @@ namespace gsolver {
   inline const std::vector<std::string> kVariableInputNamesV4 = {
     "v_log1p_staleness",     "v_log_moved",   "v_log_relative_moved", "v_uncertainty_trend", "v_log_relative_energy",
     "v_energy_trend",        "v_log_message_share", "v_log_disagreement", "v_oscillation",
+    // memory over many ticks: the change against the edge's usual change; energy settling (-1:
+    // steadily down, +1: steadily up, 0: up and down); log of the usual size of the energy changes
+    "v_log_moved_vs_history", "v_energy_settling", "v_log_energy_fluctuation",
     // the edge's message cost (setEdgeWeights; 1 without weights): e.g. 1 between robots, 0 inside one
     "v_edge_cost"};
 

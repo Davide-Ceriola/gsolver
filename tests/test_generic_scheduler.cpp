@@ -285,3 +285,36 @@ TEST(GenericScheduler, WeightedCountsAndStalenessCap) {
     ASSERT_DOUBLE_EQ(sb.weightedCounts().first, expected ? std::ceil(w.size() / 2.0) : 0.0) << "tick " << it;
   }
 }
+
+TEST(GenericScheduler, MemoryInputs) {
+  // v_log_moved_vs_history: 0 before any history (the change is its own average); v_energy_settling
+  // in [-1, 1]; v_log_energy_fluctuation finite; reset() forgets the history.
+  ScaledLoop l;
+  buildScaledLoop(l, 8, 4, 1.0);
+  VariableRule vr; // inactive send head: every edge sends (fixed_send = 1)
+  GenericScheduler s(l.graph, vr, {}, 7);
+  const auto col = [](const std::string& n) {
+    return static_cast<int>(std::find(kVariableInputNamesV4.begin(), kVariableInputNamesV4.end(), n) - kVariableInputNamesV4.begin());
+  };
+  const int hist = col("v_log_moved_vs_history"), settle = col("v_energy_settling"), fluct = col("v_log_energy_fluctuation");
+  ASSERT_LT(fluct, static_cast<int>(kVariableInputNamesV4.size()));
+  Eigen::MatrixXd X = s.variableFeatures(false);
+  for (int r = 0; r < X.rows(); ++r) {
+    EXPECT_DOUBLE_EQ(X(r, hist), 0.0);
+  }
+  for (int it = 0; it < 30; ++it) {
+    s.tick();
+    X = s.variableFeatures(false);
+    for (int r = 0; r < X.rows(); ++r) {
+      ASSERT_GE(X(r, settle), -1.0 - 1e-12);
+      ASSERT_LE(X(r, settle), 1.0 + 1e-12);
+      ASSERT_TRUE(std::isfinite(X(r, hist)) && std::isfinite(X(r, fluct)));
+    }
+  }
+  s.reset();
+  X = s.variableFeatures(false);
+  for (int r = 0; r < X.rows(); ++r) {
+    EXPECT_DOUBLE_EQ(X(r, hist), 0.0);
+    EXPECT_DOUBLE_EQ(X(r, settle), 0.0);
+  }
+}

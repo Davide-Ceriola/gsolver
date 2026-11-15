@@ -294,6 +294,9 @@ namespace gsolver {
       e->v_osc_has_delta_ = false;
       e->v_osc_cos_       = 0.0;
       e->prev_energy_     = -1.0;
+      e->hist_moved_ema_     = -1.0;
+      e->hist_trend_ema_     = 0.0;
+      e->hist_trend_abs_ema_ = 0.0;
     }
   }
 
@@ -383,6 +386,20 @@ namespace gsolver {
       row[6] = std::log(share[j] + e);
       row[7] = std::log(disagree + kSigmaFloor);
       row[8] = cos;
+      // memory over many ticks (exponential averages, ~10 ticks for the change, ~20 for the energy)
+      constexpr double kMovedRate = 0.1, kTrendRate = 0.05;
+      const double moved_ema = ed.hist_moved_ema_ < 0 ? moved[j] : ed.hist_moved_ema_;
+      row[9]                 = std::log((moved[j] + kSigmaFloor) / (moved_ema + kSigmaFloor));
+      const double tr        = row[5];
+      const double tr_ema    = (1 - kTrendRate) * ed.hist_trend_ema_ + kTrendRate * tr;
+      const double tr_abs    = (1 - kTrendRate) * ed.hist_trend_abs_ema_ + kTrendRate * std::abs(tr);
+      row[10]                = tr_abs > 1e-12 ? tr_ema / tr_abs : 0.0;
+      row[11]                = std::log(tr_abs + 1e-6);
+      if (update) {
+        ed.hist_moved_ema_     = (1 - kMovedRate) * moved_ema + kMovedRate * moved[j];
+        ed.hist_trend_ema_     = tr_ema;
+        ed.hist_trend_abs_ema_ = tr_abs;
+      }
       if (update) {
         ed.prev_energy_    = E;
         ed.v_osc_prev_     = msg.mu_;
