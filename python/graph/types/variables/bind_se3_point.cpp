@@ -4,6 +4,7 @@
 
 #include <nanobind/nanobind.h>
 #include <nanobind/ndarray.h>
+#include <nanobind/stl/pair.h>
 #include <nanobind/stl/string.h>
 
 #include <nanobind/eigen/dense.h>
@@ -46,7 +47,14 @@ namespace gsolver {
         .def_prop_ro(
           "id", [](const SE3Point& self) { return std::string(self.id_); }, "Variable node ID")
         .def_rw("mu", &SE3Point::mu_, "Current point estimate")
-        .def_rw("sigma", &SE3Point::Sigma_, "Covariance matrix");
+        .def_rw("sigma", &SE3Point::Sigma_, "Covariance matrix")
+        .def(
+          "incoming_message",
+          [](const SE3Point& self, size_t j) {
+            const auto& msg = self.edges_.at(j)->factor_to_variable_message_;
+            return std::make_pair(Eigen::Vector3d(static_cast<Eigen::Vector3d>(msg.mu_)), Eigen::Matrix3d(msg.Lambda_));
+          },
+          nb::arg("edge_index"), "(mean, precision) of the factor-to-variable message on edge j");
       add_variable_accessors<SE3Point>(cls);
     }
 

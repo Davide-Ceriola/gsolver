@@ -126,6 +126,8 @@ namespace gsolver {
              "Per-edge message costs, one per (variable, edge) row; [] = 1 each")
         .def("set_active_edges", &G::setActiveEdges, nb::arg("active"),
              "Active edges, one flag per (variable, edge) row ([] = all): inactive edges never send")
+        .def("set_incoming_dampings", &G::setIncomingDampings, nb::arg("damping"),
+             "Per-edge incoming damping, one per (variable, edge) row (for schedules using tick_masks)")
         .def("weighted_counts", &G::weightedCounts, "Cost of the last tick's messages: (v2f, f2v)");
 
       bind_rule_scheduler_type<SE2Pose>(m, "RuleSchedulerSE2");

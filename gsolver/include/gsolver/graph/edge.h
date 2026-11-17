@@ -59,6 +59,19 @@ namespace gsolver {
     VectorT v_osc_delta_ = VectorT::Zero();
     bool v_osc_has_prev_ = false, v_osc_has_delta_ = false;
     double v_osc_cos_    = 0.0;
+    // local eigenvalue of the incoming message's iteration: <change, previous change> / |previous|^2
+    double v_osc_ratio_  = 0.0;
+    // belief covariance at the last send, and its precision and log det (factorised lazily)
+    typename MessageType::MatrixLieDim last_sent_sigma_ = MessageType::MatrixLieDim::Identity();
+    typename MessageType::MatrixLieDim kl_ref_lambda_   = MessageType::MatrixLieDim::Identity();
+    double kl_ref_logdet_ = 0.0;
+    bool kl_ref_valid_    = false;
+    // the cavity (belief without this edge's incoming message) at the last send: mean, precision,
+    // log det of its covariance (what the factor received)
+    EstimateT last_sent_cav_mu_;
+    typename MessageType::MatrixLieDim kl_cav_lambda_ = MessageType::MatrixLieDim::Zero();
+    double kl_cav_logdet_ = 0.0;
+    bool kl_cav_valid_    = false;
     double prev_energy_  = -1.0;
     // memory over many ticks (exponential averages): the edge's usual change, and the direction and
     // size of its energy changes (settling: steadily down; oscillating: up and down)

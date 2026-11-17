@@ -36,7 +36,7 @@ public:
   virtual void sendMessages(const std::vector<int>& mask) = 0;
 
   // ---- Generic rule inputs (core/generic_scheduler.h), computed by the typed variable ----
-  static constexpr int kRuleInputs = 12;
+  static constexpr int kRuleInputs = 15;
   virtual int lieDim() const = 0;
   virtual void ruleReset()   = 0;
   // Rows (one per edge, kRuleInputs columns, row stride `stride`) of the variable's rule inputs;

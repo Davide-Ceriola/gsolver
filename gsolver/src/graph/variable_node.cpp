@@ -295,6 +295,10 @@ namespace gsolver {
       e->v_osc_has_prev_  = false;
       e->v_osc_has_delta_ = false;
       e->v_osc_cos_       = 0.0;
+      e->v_osc_ratio_     = 0.0;
+      e->last_sent_sigma_ = Sigma_;
+      e->kl_ref_valid_    = false;
+      e->kl_cav_valid_    = false;
       e->prev_energy_     = -1.0;
       e->hist_moved_ema_     = -1.0;
       e->hist_trend_ema_     = 0.0;
@@ -302,14 +306,44 @@ namespace gsolver {
     }
   }
 
+  // Cavity of edge j (the belief without its incoming message), as the solver computes the message
+  // (sendAllMessages): precision and information in the tangent space at mu, from the belief sums.
+  // Returns the cavity mean, its precision (regularised) and log det of its covariance.
+  template <typename V, typename EstimateT, typename MatrixT, typename VectorT, typename MessageT>
+  static void cavityOf(const EstimateT& mu, const MatrixT& Lambda_total, const VectorT& eta_total, const MessageT& m,
+                       double reg, EstimateT& cav_mu, MatrixT& cav_lambda, double& cav_logdet) {
+    const MatrixT L = transportPrecision<V>(mu, m.mu_, m.Lambda_);
+    const VectorT eta = L * V::boxminus(mu, m.mu_);
+    cav_lambda        = Lambda_total - L + MatrixT::Identity() * reg;
+    const Eigen::LDLT<MatrixT> ldlt(cav_lambda);
+    const VectorT tau = ldlt.solve(VectorT(eta_total - eta));
+    cav_mu            = V::boxplus(mu, tau);
+    cav_logdet        = -ldlt.vectorD().array().max(1e-300).log().sum(); // log det of the covariance
+  }
+
   template <int Dim_, typename EstimateType_, typename EdgeType_>
   void VariableNode<Dim_, EstimateType_, EdgeType_>::ruleRecordSends(const std::vector<int>& mask, long tick) {
+    using V = typename EdgeType_::VariableType_;
+    bool any = false;
+    for (size_t j = 0; j < mask.size() && j < edges_.size(); ++j) {
+      any = any || mask[j];
+    }
+    MatrixLieDim Lt;
+    VectorLieDim et;
+    if (any) {
+      beliefSums(Lt, et);
+    }
     for (size_t j = 0; j < mask.size() && j < edges_.size(); ++j) {
       if (mask[j]) {
         auto& e           = edges_[j];
+        cavityOf<V>(mu_, Lt, et, e->factor_to_variable_message_, kInformationRegularization, e->last_sent_cav_mu_,
+                    e->kl_cav_lambda_, e->kl_cav_logdet_);
+        e->kl_cav_valid_ = true;
         e->incoming_gap_  = tick - e->last_sent_tick_;
         e->last_sent_tick_ = tick;
         e->last_sent_mu_  = mu_;
+        e->last_sent_sigma_ = Sigma_; // the belief sent (called before the belief update)
+        e->kl_ref_valid_    = false;
         e->has_last_sent_ = true;
       }
     }
@@ -340,6 +374,9 @@ namespace gsolver {
       }
     }
     const double trend  = rule_has_logdet_ ? std::clamp((logdet - rule_prev_logdet_) / d, -5.0, 5.0) : 0.0;
+    MatrixLieDim cav_Lt;
+    VectorLieDim cav_et;
+    beliefSums(cav_Lt, cav_et);
     std::vector<double> moved(k), share(k);
     double mean_moved = 0.0, mean_energy = 0.0;
     size_t k_active = 0;
@@ -347,6 +384,9 @@ namespace gsolver {
       // an edge added after ruleReset (graphs that grow): it starts now, as if it had just sent
       if (!edges_[j]->has_last_sent_) {
         edges_[j]->last_sent_mu_   = mu_;
+        edges_[j]->last_sent_sigma_ = Sigma_;
+        edges_[j]->kl_ref_valid_    = false;
+        edges_[j]->kl_cav_valid_    = false;
         edges_[j]->last_sent_tick_ = tick;
         edges_[j]->has_last_sent_  = true;
       }
@@ -378,7 +418,7 @@ namespace gsolver {
       const SpdSolver<Dim_> combined(MatrixLieDim(Lb + msg.Lambda_ + MatrixLieDim::Identity() * kInformationRegularization));
       const double disagree = std::sqrt(std::max(Lmr.dot(combined.solve(Lbr)), 0.0) / d);
       // oscillation of the incoming message, in the belief's metric
-      double cos = ed.v_osc_cos_;
+      double cos = ed.v_osc_cos_, ratio = ed.v_osc_ratio_;
       // an unchanged message (bitwise) has a zero change: nothing to update, skip the logarithm
       const bool msg_changed = !ed.v_osc_has_prev_ ||
                                std::memcmp(&ed.v_osc_prev_, &msg.mu_, sizeof(msg.mu_)) != 0;
@@ -389,13 +429,16 @@ namespace gsolver {
           if (ed.v_osc_has_delta_) {
             const double a = std::sqrt(std::max(ed.v_osc_delta_.dot(Lb * ed.v_osc_delta_), 0.0));
             if (a > 1e-12) {
-              cos = delta.dot(Lb * ed.v_osc_delta_) / (std::sqrt(sq) * a);
+              const double inner = delta.dot(Lb * ed.v_osc_delta_);
+              cos                = inner / (std::sqrt(sq) * a);
+              ratio              = std::clamp(inner / (a * a), -5.0, 5.0);
             }
           }
           if (update) {
             ed.v_osc_delta_     = delta;
             ed.v_osc_has_delta_ = true;
             ed.v_osc_cos_       = cos;
+            ed.v_osc_ratio_     = ratio;
           }
         }
       }
@@ -418,6 +461,42 @@ namespace gsolver {
       const double tr_abs    = (1 - kTrendRate) * ed.hist_trend_abs_ema_ + kTrendRate * std::abs(tr);
       row[10]                = tr_abs > 1e-12 ? tr_ema / tr_abs : 0.0;
       row[11]                = std::log(tr_abs + 1e-6);
+      // KL(N(mu, Sigma) || N(mu_s, Sigma_s)) per dimension, (mu_s, Sigma_s) the belief at the last send:
+      // 0.5 (tr(Lambda_s Sigma) - d + log det Sigma_s - log det Sigma + dm^T Lambda_s dm)
+      if (!ed.kl_ref_valid_) {
+        const Eigen::LLT<MatrixLieDim> llt_s(ed.last_sent_sigma_);
+        if (llt_s.info() == Eigen::Success) {
+          ed.kl_ref_lambda_ = llt_s.solve(MatrixLieDim(MatrixLieDim::Identity()));
+          ed.kl_ref_logdet_ = 2.0 * llt_s.matrixL().toDenseMatrix().diagonal().array().max(1e-150).log().sum();
+        } else {
+          const Eigen::LDLT<MatrixLieDim> ldlt_s(ed.last_sent_sigma_);
+          ed.kl_ref_lambda_ = ldlt_s.solve(MatrixLieDim(MatrixLieDim::Identity()));
+          ed.kl_ref_logdet_ = ldlt_s.vectorD().array().max(1e-300).log().sum();
+        }
+        ed.kl_ref_valid_ = true;
+      }
+      const VectorLieDim dm_s = V::boxminus(ed.last_sent_mu_, mu_);
+      const double kl = 0.5 * (ed.kl_ref_lambda_.cwiseProduct(Sigma_).sum() - d + ed.kl_ref_logdet_ - logdet +
+                               dm_s.dot(ed.kl_ref_lambda_ * dm_s));
+      row[12] = std::log(std::max(kl, 0.0) / d + 1e-6);
+      row[13] = ratio;
+      {
+        EstimateType_ cmu;
+        MatrixLieDim clam;
+        double clogdet;
+        cavityOf<V>(mu_, cav_Lt, cav_et, msg, kInformationRegularization, cmu, clam, clogdet);
+        if (!ed.kl_cav_valid_) { // no send recorded yet: the reference is the cavity now
+          ed.last_sent_cav_mu_ = cmu;
+          ed.kl_cav_lambda_    = clam;
+          ed.kl_cav_logdet_    = clogdet;
+          ed.kl_cav_valid_     = true;
+        }
+        const MatrixLieDim csig  = clam.ldlt().solve(MatrixLieDim(MatrixLieDim::Identity()));
+        const VectorLieDim cd    = V::boxminus(ed.last_sent_cav_mu_, cmu);
+        const double kl_cav = 0.5 * (ed.kl_cav_lambda_.cwiseProduct(csig).sum() - d + ed.kl_cav_logdet_ - clogdet +
+                                     cd.dot(ed.kl_cav_lambda_ * cd));
+        row[14] = std::log(std::max(kl_cav, 0.0) / d + 1e-6);
+      }
       if (update) {
         ed.hist_moved_ema_     = (1 - kMovedRate) * moved_ema + kMovedRate * moved[j];
         ed.hist_trend_ema_     = tr_ema;

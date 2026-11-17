@@ -42,6 +42,13 @@ namespace gsolver {
     // memory over many ticks: the change against the edge's usual change; energy settling (-1:
     // steadily down, +1: steadily up, 0: up and down); log of the usual size of the energy changes
     "v_log_moved_vs_history", "v_energy_settling", "v_log_energy_fluctuation",
+    // information since the last send: log of KL(belief now || belief at the last send) per
+    // dimension (mean and precision changes in one quantity); local eigenvalue of the incoming
+    // message's iteration (<change, previous change> / |previous change|^2, belief metric)
+    "v_log_kl", "v_osc_ratio",
+    // log of KL(cavity now || cavity at the last send) per dimension: the change of the message
+    // the edge would send (belief without the edge's incoming message)
+    "v_log_kl_cavity",
     // the edge's message cost (setEdgeWeights; 1 without weights): e.g. 1 between robots, 0 inside one
     "v_edge_cost"};
 
@@ -211,6 +218,23 @@ namespace gsolver {
     }
 
     // One tick with given variable decisions; the factor rule (if any) decides the replies
+    // Per-edge incoming damping, one value per (variable, edge) row in graph order: schedules that
+    // decide outside the rule (tickMasks) set their own damping
+    void setIncomingDampings(const std::vector<double>& damping) {
+      size_t row = 0;
+      for (auto& v : graph_.variable_nodes_) {
+        for (size_t j = 0; j < v->numberOfEdges(); ++j, ++row) {
+          if (row >= damping.size()) {
+            throw std::invalid_argument("setIncomingDampings: one value per edge row");
+          }
+          v->setIncomingDamping(j, damping[row]);
+        }
+      }
+      if (row != damping.size()) {
+        throw std::invalid_argument("setIncomingDampings: one value per edge row");
+      }
+    }
+
     TickCounts tickMasks(const std::vector<std::vector<int>>& masks) {
       TickCounts counts;
       ++ticks_;
