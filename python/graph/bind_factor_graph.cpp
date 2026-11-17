@@ -12,6 +12,7 @@
 #include <gsolver/graph/types/factors/se3_posevel_pose.h>
 #include <gsolver/graph/types/factors/se3_posevel_posevel.h>
 #include <gsolver/graph/types/factors/se3_posevel_prior.h>
+#include <gsolver/graph/types/factors/se3_posevel_stereo_point.h>
 #include <gsolver/graph/types/variables/se3_point.h>
 #include <gsolver/graph/types/variables/se3_pose.h>
 #include <gsolver/graph/types/variables/se3_posevel.h>
@@ -128,6 +129,14 @@ namespace gsolver {
           nb::arg("factor"),
           nb::arg("variable_ids"),
           "Add a pose-to-point factor to the graph")
+        .def(
+          "add_factor",
+          [](FactorGraph& fg, std::shared_ptr<SE3PoseVelStereoPoint> factor, std::vector<std::string> var_ids) {
+            fg.addFactorNode(factor, var_ids);
+          },
+          nb::arg("factor"),
+          nb::arg("variable_ids"),
+          "Add a stereo camera factor to the graph")
 
         // Getters
         .def("get_variable", &FactorGraph::getVariableNode, nb::arg("id"), nb::rv_policy::reference, "Get a variable node by ID")

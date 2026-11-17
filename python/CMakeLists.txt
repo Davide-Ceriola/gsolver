@@ -37,6 +37,7 @@ set(BINDING_SOURCES
     graph/types/factors/bind_se3_posevel_gp.cpp
     graph/types/factors/bind_se3_posevel_pose.cpp
     graph/types/factors/bind_se3_posevel_point.cpp
+    graph/types/factors/bind_se3_posevel_stereo_point.cpp
     graph/types/bind_pose_graph.cpp
 )
 

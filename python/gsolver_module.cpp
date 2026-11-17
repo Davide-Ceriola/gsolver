@@ -27,6 +27,7 @@ namespace gsolver::python {
   void bind_se3_posevel_gp(nb::module_& m);
   void bind_se3_posevel_pose(nb::module_& m);
   void bind_se3_posevel_point(nb::module_& m);
+  void bind_se3_posevel_stereo_point(nb::module_& m);
   void bind_pose_graph(nb::module_& m);
   void bind_rule_scheduler(nb::module_& m);
 } // namespace gsolver::python
@@ -96,6 +97,7 @@ NB_MODULE(_gsolver, m) {
   gsolver::python::bind_se3_posevel_gp(m);
   gsolver::python::bind_se3_posevel_pose(m);
   gsolver::python::bind_se3_posevel_point(m);
+  gsolver::python::bind_se3_posevel_stereo_point(m);
 
   // Graph module - factor graph (depends on variable and factor types)
   gsolver::python::bind_factor_graph(m);
