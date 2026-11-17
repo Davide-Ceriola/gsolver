@@ -82,13 +82,24 @@ namespace gsolver {
       return Dim_;
     }
     double energy() const override {
-      return 0.5 * error_.dot(Sigma_.ldlt().solve(error_));
+      // the information matrix is factorised once and kept while the covariance stays the same
+      if (!energy_info_valid_ || energy_sigma_ != Sigma_) {
+        energy_sigma_      = Sigma_;
+        energy_info_       = Sigma_.ldlt().solve(MatrixErrorDim(MatrixErrorDim::Identity()));
+        energy_info_valid_ = true;
+      }
+      return 0.5 * error_.dot(energy_info_ * error_);
     }
     size_t sendAllMessagesIfNew() override;
 
     // Update error and Jacobian of the factor
     // This function should be implemented in the derived class
     virtual void updateErrorAndJacobian() = 0;
+
+  private:
+    mutable MatrixErrorDim energy_sigma_;
+    mutable MatrixErrorDim energy_info_;
+    mutable bool energy_info_valid_ = false;
   };
 
 } // namespace gsolver

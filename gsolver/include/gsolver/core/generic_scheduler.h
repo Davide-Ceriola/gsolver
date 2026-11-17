@@ -124,6 +124,24 @@ namespace gsolver {
       }
       edge_weight_ = w;
     }
+    // Active edges (one flag per (variable, edge) row; empty: all active). An inactive edge never
+    // sends (its variable's decision is forced to 0) and its factor counts as having no energy in
+    // the rule inputs, so the scheduler sees only the active subgraph: e.g. an online problem
+    // whose poses and measurements arrive over time, built whole and activated as they arrive
+    void setActiveEdges(const std::vector<int>& active) {
+      if (!active.empty() && active.size() != numberOfEdges()) {
+        throw std::invalid_argument("GenericScheduler::setActiveEdges: one flag per edge");
+      }
+      edge_active_.assign(active.begin(), active.end());
+      factor_active_.assign(graph_.factor_nodes_.size(), 1);
+      if (!edge_active_.empty()) {
+        for (size_t f = 0; f < factor_edge_rows_.size(); ++f) {
+          for (size_t r : factor_edge_rows_[f]) {
+            factor_active_[f] = factor_active_[f] && edge_active_[r];
+          }
+        }
+      }
+    }
     std::pair<double, double> weightedCounts() const {
       return {last_weighted_v2f_, last_weighted_f2v_};
     }
@@ -134,10 +152,13 @@ namespace gsolver {
       Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor> X(numberOfEdges(), n);
       std::vector<double> energy(graph_.factor_nodes_.size());
       for (size_t f = 0; f < energy.size(); ++f) {
-        energy[f] = graph_.factor_nodes_[f]->energy() / graph_.factor_nodes_[f]->errorDim();
+        energy[f] = factor_active_.empty() || factor_active_[f]
+                      ? graph_.factor_nodes_[f]->energy() / graph_.factor_nodes_[f]->errorDim()
+                      : 0.0;
       }
       size_t row = 0;
       std::vector<double> edge_energy;
+      std::vector<char> edge_active;
       for (size_t i = 0; i < graph_.variable_nodes_.size(); ++i) {
         auto& v = graph_.variable_nodes_[i];
         const size_t k = v->numberOfEdges();
@@ -145,8 +166,12 @@ namespace gsolver {
         for (size_t j = 0; j < k; ++j) {
           edge_energy[j] = energy[edge_factor_[i][j]];
         }
+        if (!edge_active_.empty()) {
+          edge_active.assign(edge_active_.begin() + row, edge_active_.begin() + row + k);
+        }
         if (k) {
-          v->ruleInputs(ticks_, edge_energy.data(), X.data() + row * n, n, update);
+          v->ruleInputs(ticks_, edge_energy.data(), X.data() + row * n, n, update,
+                        edge_active_.empty() ? nullptr : edge_active.data());
         }
         for (size_t j = 0; j < k; ++j) {
           X(row + j, n - 1) = weight(row + j);
@@ -166,7 +191,7 @@ namespace gsolver {
         auto& v = graph_.variable_nodes_[i];
         masks[i].resize(v->numberOfEdges());
         for (size_t j = 0; j < masks[i].size(); ++j, ++row) {
-          const Eigen::VectorXd x = X.row(row).transpose();
+          const auto x = X.row(row); // a view: no allocation per edge
           if (vrule_.damping.active) {
             v->setIncomingDamping(j, vrule_.damping(x));
           }
@@ -176,6 +201,9 @@ namespace gsolver {
           // input 0 is log1p(ticks since the last send on this edge)
           if (vrule_.max_silence > 0 && std::expm1(x[0]) + 0.5 >= static_cast<double>(vrule_.max_silence)) {
             masks[i][j] = 1;
+          }
+          if (!edge_active_.empty() && !edge_active_[row]) {
+            masks[i][j] = 0;
           }
         }
       }
@@ -333,6 +361,8 @@ namespace gsolver {
     std::vector<char> edge_slot_;                                   // one per (variable, edge)
     std::vector<std::vector<size_t>> factor_edge_rows_;             // per factor, per edge: its row
     std::vector<double> edge_weight_;                               // per row; empty: 1
+    std::vector<char> edge_active_;                                 // per row; empty: all active
+    std::vector<char> factor_active_;                               // per factor; empty: all active
     std::vector<size_t> f2v_seen_;                                  // per row: f2v_sent_ at the last tick
     double last_weighted_v2f_ = 0.0, last_weighted_f2v_ = 0.0;
     Eigen::MatrixXd last_factor_features_;

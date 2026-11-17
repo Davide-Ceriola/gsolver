@@ -100,7 +100,8 @@ namespace gsolver {
     Eigen::VectorXd coef;
     double intercept = 0.0;
     double scale     = 1.0;
-    double operator()(const Eigen::VectorXd& x_all) const {
+    template <typename Derived>
+    double operator()(const Eigen::MatrixBase<Derived>& x_all) const {
       double logit = intercept;
       for (size_t c = 0; c < features.size(); ++c) {
         logit += coef[c] * x_all[features[c]];

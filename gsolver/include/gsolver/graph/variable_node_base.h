@@ -42,7 +42,9 @@ public:
   // Rows (one per edge, kRuleInputs columns, row stride `stride`) of the variable's rule inputs;
   // edge_energy[j]: energy per error dimension of the factor on edge j. update: advance the state
   // (previous energies, uncertainty, oscillation)
-  virtual void ruleInputs(long tick, const double* edge_energy, double* out, int stride, bool update) = 0;
+  // active: one flag per edge (nullptr: all active); the means across edges use the active ones only
+  virtual void ruleInputs(long tick, const double* edge_energy, double* out, int stride, bool update,
+                          const char* active = nullptr) = 0;
   // Record the sends of this tick (before the belief update): last-sent belief, tick and gap
   virtual void ruleRecordSends(const std::vector<int>& mask, long tick) = 0;
   // Set the damping of the incoming factor-to-variable message on edge j

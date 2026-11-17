@@ -1,6 +1,8 @@
 #include <gsolver/graph/variable_node.h>
 #include <gsolver/maths/lie_options.h>
 
+#include <cstring>
+
 namespace gsolver {
 
   template <int Dim_, typename EstimateType_, typename EdgeType_>
@@ -315,7 +317,7 @@ namespace gsolver {
 
   template <int Dim_, typename EstimateType_, typename EdgeType_>
   void VariableNode<Dim_, EstimateType_, EdgeType_>::ruleInputs(long tick, const double* edge_energy, double* out,
-                                                               int stride, bool update) {
+                                                               int stride, bool update, const char* active) {
     using V            = typename EdgeType_::VariableType_;
     constexpr double e = 1e-9;
     // Changes below a thousandth of a standard deviation (per dimension) count as no change: below
@@ -323,12 +325,24 @@ namespace gsolver {
     constexpr double kSigmaFloor = 1e-3;
     const size_t k     = edges_.size();
     const double d     = static_cast<double>(Dim_);
-    const MatrixLieDim Lb = SpdSolver<Dim_>(Sigma_).solve(MatrixLieDim(MatrixLieDim::Identity())); // belief precision
-    // uncertainty trend: mean log eigenvalue change of the covariance
-    const double logdet = Eigen::LDLT<MatrixLieDim>(Sigma_).vectorD().array().max(1e-300).log().sum();
+    // belief precision and log det of the covariance from one factorisation (LDLT if not positive definite)
+    MatrixLieDim Lb;
+    double logdet;
+    {
+      const Eigen::LLT<MatrixLieDim> llt(Sigma_);
+      if (llt.info() == Eigen::Success) {
+        Lb     = llt.solve(MatrixLieDim(MatrixLieDim::Identity()));
+        logdet = 2.0 * llt.matrixL().toDenseMatrix().diagonal().array().max(1e-150).log().sum();
+      } else {
+        const Eigen::LDLT<MatrixLieDim> ldlt(Sigma_);
+        Lb     = ldlt.solve(MatrixLieDim(MatrixLieDim::Identity()));
+        logdet = ldlt.vectorD().array().max(1e-300).log().sum();
+      }
+    }
     const double trend  = rule_has_logdet_ ? std::clamp((logdet - rule_prev_logdet_) / d, -5.0, 5.0) : 0.0;
     std::vector<double> moved(k), share(k);
     double mean_moved = 0.0, mean_energy = 0.0;
+    size_t k_active = 0;
     for (size_t j = 0; j < k; ++j) {
       // an edge added after ruleReset (graphs that grow): it starts now, as if it had just sent
       if (!edges_[j]->has_last_sent_) {
@@ -340,26 +354,35 @@ namespace gsolver {
     for (size_t j = 0; j < k; ++j) {
       const VectorLieDim dm = V::boxminus(edges_[j]->last_sent_mu_, mu_);
       moved[j]              = std::sqrt(std::max(dm.dot(Lb * dm), 0.0) / d);
-      mean_moved += moved[j];
-      mean_energy += edge_energy[j];
+      if (active == nullptr || active[j]) {
+        mean_moved += moved[j];
+        mean_energy += edge_energy[j];
+        ++k_active;
+      }
     }
-    mean_moved  = k ? mean_moved / k : 0.0;
-    mean_energy = std::max(k ? mean_energy / k : 0.0, e);
+    mean_moved  = k_active ? mean_moved / k_active : 0.0;
+    mean_energy = std::max(k_active ? mean_energy / k_active : 0.0, e);
     for (size_t j = 0; j < k; ++j) {
       auto& ed              = *edges_[j];
       const auto& msg       = ed.factor_to_variable_message_;
       const double E        = edge_energy[j];
       const double E_prev   = ed.prev_energy_ < 0 ? E : ed.prev_energy_;
       // the share of the belief's precision this message provides, per dimension
-      share[j] = (msg.Lambda_ * Sigma_).trace() / d;
-      // disagreement in the combined metric (Sigma_b + Sigma_m)^-1 = Lm (Lb + Lm)^-1 Lb
+      // tr(Lm Sigma) = sum of the elementwise product (both symmetric)
+      share[j] = msg.Lambda_.cwiseProduct(Sigma_).sum() / d;
+      // disagreement in the combined metric (Sigma_b + Sigma_m)^-1 = Lm (Lb + Lm)^-1 Lb:
+      // r^T Lm (Lb + Lm)^-1 Lb r, one factorisation and one vector solve
       const VectorLieDim r   = V::boxminus(mu_, msg.mu_);
-      const MatrixLieDim Mc  = msg.Lambda_ * SpdSolver<Dim_>(MatrixLieDim(Lb + msg.Lambda_ +
-                                 MatrixLieDim::Identity() * kInformationRegularization)).solve(Lb);
-      const double disagree = std::sqrt(std::max(r.dot(Mc * r), 0.0) / d);
+      const VectorLieDim Lbr = Lb * r;
+      const VectorLieDim Lmr = msg.Lambda_ * r;
+      const SpdSolver<Dim_> combined(MatrixLieDim(Lb + msg.Lambda_ + MatrixLieDim::Identity() * kInformationRegularization));
+      const double disagree = std::sqrt(std::max(Lmr.dot(combined.solve(Lbr)), 0.0) / d);
       // oscillation of the incoming message, in the belief's metric
       double cos = ed.v_osc_cos_;
-      if (ed.v_osc_has_prev_) {
+      // an unchanged message (bitwise) has a zero change: nothing to update, skip the logarithm
+      const bool msg_changed = !ed.v_osc_has_prev_ ||
+                               std::memcmp(&ed.v_osc_prev_, &msg.mu_, sizeof(msg.mu_)) != 0;
+      if (ed.v_osc_has_prev_ && msg_changed) {
         const VectorLieDim delta = V::boxminus(ed.v_osc_prev_, msg.mu_);
         const double sq          = delta.dot(Lb * delta);
         if (std::sqrt(std::max(sq, 0.0) / d) > kSigmaFloor) {
@@ -402,7 +425,9 @@ namespace gsolver {
       }
       if (update) {
         ed.prev_energy_    = E;
-        ed.v_osc_prev_     = msg.mu_;
+        if (msg_changed) {
+          ed.v_osc_prev_ = msg.mu_;
+        }
         ed.v_osc_has_prev_ = true;
       }
     }

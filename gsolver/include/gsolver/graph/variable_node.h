@@ -35,7 +35,8 @@ namespace gsolver {
       return LieDim_;
     }
     void ruleReset() override;
-    void ruleInputs(long tick, const double* edge_energy, double* out, int stride, bool update) override;
+    void ruleInputs(long tick, const double* edge_energy, double* out, int stride, bool update,
+                    const char* active = nullptr) override;
     void ruleRecordSends(const std::vector<int>& mask, long tick) override;
     void setIncomingDamping(size_t j, double d) override {
       edges_.at(j)->damping_ = d;
