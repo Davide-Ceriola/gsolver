@@ -61,6 +61,8 @@ namespace gsolver {
     double v_osc_cos_    = 0.0;
     // local eigenvalue of the incoming message's iteration: <change, previous change> / |previous|^2
     double v_osc_ratio_  = 0.0;
+    // per tangent component: 2ab / (a^2 + b^2) of its last two changes (-1: alternating, +1: steady)
+    VectorT v_osc_component_ = VectorT::Zero();
     // belief covariance at the last send, and its precision and log det (factorised lazily)
     typename MessageType::MatrixLieDim last_sent_sigma_ = MessageType::MatrixLieDim::Identity();
     typename MessageType::MatrixLieDim kl_ref_lambda_   = MessageType::MatrixLieDim::Identity();

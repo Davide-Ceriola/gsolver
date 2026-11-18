@@ -21,6 +21,7 @@
 //     tick; f's Mahalanobis distance per error dim; f's energy trend and change since the reply to
 //     v; oscillation and change (per dim) of v's incoming message; ticks between v's last messages
 
+#include <cmath>
 #include <memory>
 #include <stdexcept>
 #include <random>
@@ -52,6 +53,13 @@ namespace gsolver {
     // the edge's message cost (setEdgeWeights; 1 without weights): e.g. 1 between robots, 0 inside one
     "v_edge_cost"};
 
+  // Per tangent component c of an edge's variable (EdgeBase::component_inputs_), for a damping per
+  // component: movement since the last send in c's standard deviations relative to the edge's
+  // movement per dimension (log); oscillation of c in the incoming message (2ab / (a^2 + b^2) of its
+  // last two changes: -1 alternating); log of the share of c's precision the message provides
+  inline const std::vector<std::string> kVariableComponentInputNames = {"c_log_relative_moved", "c_oscillation",
+                                                                      "c_log_precision_share"};
+
   inline const std::vector<std::string> kFactorInputNamesV4 = {
     "f_log1p_reply_staleness", "f_log_news",          "f_target_sent",       "f_log_mahalanobis", "f_energy_trend",
     "f_log_energy_since_reply", "f_incoming_oscillation", "f_log_incoming_change", "f_log1p_incoming_gap"};
@@ -60,6 +68,11 @@ namespace gsolver {
   struct VariableRule {
     LogisticHead send;
     LogisticHead damping;
+    // Optional damping per tangent component (needs damping): component c of edge (v, f) is damped by
+    // damping.scale * sigmoid(damping logit + intercept + coef . z_c), z_c the component inputs
+    // (features index kVariableComponentInputNames): the same weights for every component, so the
+    // head applies to variables of any dimension
+    LogisticHead damping_components;
     double fixed_send = 1.0;
     // Staleness cap: an edge silent for max_silence ticks sends regardless of the rule (0: off).
     // Every edge then sends at least once every max_silence ticks: bounded-delay asynchronous GBP
@@ -201,6 +214,9 @@ namespace gsolver {
           const auto x = X.row(row); // a view: no allocation per edge
           if (vrule_.damping.active) {
             v->setIncomingDamping(j, vrule_.damping(x));
+            if (vrule_.damping_components.active) {
+              dampComponents(*v, j, x);
+            }
           }
           const double p = vrule_.send.active ? vrule_.send(x) : vrule_.fixed_send;
           const double u = uniforms.size() ? uniforms[row] : unit(rng_);
@@ -233,6 +249,47 @@ namespace gsolver {
       if (row != damping.size()) {
         throw std::invalid_argument("setIncomingDampings: one value per edge row");
       }
+    }
+
+    // Per-component incoming damping, the components of each (variable, edge) row in graph order
+    // (lieDim values per row), for schedules using tickMasks
+    void setIncomingDampingComponents(const std::vector<double>& damping) {
+      size_t pos = 0;
+      for (auto& v : graph_.variable_nodes_) {
+        const int dim = v->lieDim();
+        for (size_t j = 0; j < v->numberOfEdges(); ++j, pos += dim) {
+          if (pos + dim > damping.size()) {
+            throw std::invalid_argument("setIncomingDampingComponents: lieDim values per edge row");
+          }
+          v->setIncomingDampingComponents(j, damping.data() + pos, dim);
+        }
+      }
+      if (pos != damping.size()) {
+        throw std::invalid_argument("setIncomingDampingComponents: lieDim values per edge row");
+      }
+    }
+
+    // Component inputs of the last variableFeatures call: one row per (variable, edge, component),
+    // in graph order, kVariableComponentInputNames columns
+    Eigen::MatrixXd componentFeatures() const {
+      size_t rows = 0;
+      for (const auto& v : graph_.variable_nodes_) {
+        rows += v->numberOfEdges() * v->lieDim();
+      }
+      const int K = VariableNodeBase::kComponentInputs;
+      Eigen::MatrixXd Z = Eigen::MatrixXd::Zero(rows, K);
+      size_t r = 0;
+      for (const auto& v : graph_.variable_nodes_) {
+        for (size_t j = 0; j < v->numberOfEdges(); ++j) {
+          const auto& ci = v->getEdgeAt(j)->component_inputs_;
+          for (int c = 0; c < v->lieDim(); ++c, ++r) {
+            for (int q = 0; q < K && static_cast<size_t>(K * c + q) < ci.size(); ++q) {
+              Z(r, q) = ci[K * c + q];
+            }
+          }
+        }
+      }
+      return Z;
     }
 
     TickCounts tickMasks(const std::vector<std::vector<int>>& masks) {
@@ -284,6 +341,33 @@ namespace gsolver {
     bool record_factor_features_ = false;
 
   private:
+    // The component damping head on edge j of v (x: the edge's inputs, as for the damping head)
+    template <typename Row>
+    void dampComponents(VariableNodeBase& v, size_t j, const Row& x) {
+      const LogisticHead& h = vrule_.damping;
+      const LogisticHead& hc = vrule_.damping_components;
+      double base = h.intercept + hc.intercept;
+      for (size_t c = 0; c < h.features.size(); ++c) {
+        base += h.coef[c] * x[h.features[c]];
+      }
+      const auto& ci = v.getEdgeAt(j)->component_inputs_;
+      const int dim  = v.lieDim();
+      const int K    = VariableNodeBase::kComponentInputs;
+      if (ci.size() < static_cast<size_t>(K * dim)) {
+        return; // no component inputs yet: the scalar damping stays
+      }
+      component_buffer_.resize(dim);
+      for (int k = 0; k < dim; ++k) {
+        double logit = base;
+        for (size_t c = 0; c < hc.features.size(); ++c) {
+          logit += hc.coef[c] * ci[K * k + hc.features[c]];
+        }
+        component_buffer_[k] = h.scale / (1.0 + std::exp(-logit));
+      }
+      v.setIncomingDampingComponents(j, component_buffer_.data(), dim);
+    }
+    std::vector<double> component_buffer_;
+
     size_t factorStage() {
       constexpr double kEps = 1e-9;
       constexpr double kSigmaFloor = 1e-3; // a thousandth of a standard deviation: below it, no change

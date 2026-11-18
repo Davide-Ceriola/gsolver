@@ -89,10 +89,12 @@ namespace gsolver {
       // ---- v4: GenericScheduler (any variable types; unit-invariant inputs) ----
       m.attr("VARIABLE_INPUT_NAMES_V4") = kVariableInputNamesV4;
       m.attr("FACTOR_INPUT_NAMES_V4")   = kFactorInputNamesV4;
+      m.attr("VARIABLE_COMPONENT_INPUT_NAMES") = kVariableComponentInputNames;
       nb::class_<VariableRule>(m, "VariableRule", "Variable rule: send head (or fixed_send) and incoming damping head")
         .def(nb::init<>())
         .def_rw("send", &VariableRule::send)
         .def_rw("damping", &VariableRule::damping)
+        .def_rw("damping_components", &VariableRule::damping_components)
         .def_rw("fixed_send", &VariableRule::fixed_send)
         .def_rw("max_silence", &VariableRule::max_silence);
       using G = GenericScheduler;
@@ -128,6 +130,11 @@ namespace gsolver {
              "Active edges, one flag per (variable, edge) row ([] = all): inactive edges never send")
         .def("set_incoming_dampings", &G::setIncomingDampings, nb::arg("damping"),
              "Per-edge incoming damping, one per (variable, edge) row (for schedules using tick_masks)")
+        .def("set_incoming_damping_components", &G::setIncomingDampingComponents, nb::arg("damping"),
+             "Per-component incoming damping: lie_dim values per (variable, edge) row, rows in graph order")
+        .def("component_features", &G::componentFeatures,
+             "Component inputs of the last features() call: rows (variable, edge, component), "
+             "columns VARIABLE_COMPONENT_INPUT_NAMES")
         .def("weighted_counts", &G::weightedCounts, "Cost of the last tick's messages: (v2f, f2v)");
 
       bind_rule_scheduler_type<SE2Pose>(m, "RuleSchedulerSE2");

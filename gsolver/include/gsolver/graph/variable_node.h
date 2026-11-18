@@ -2,6 +2,7 @@
 
 #include <Eigen/Dense>
 #include <memory>
+#include <stdexcept>
 
 #include <gsolver/graph/edge.h>
 #include <gsolver/graph/variable_node_base.h>
@@ -40,6 +41,19 @@ namespace gsolver {
     void ruleRecordSends(const std::vector<int>& mask, long tick) override;
     void setIncomingDamping(size_t j, double d) override {
       edges_.at(j)->damping_ = d;
+      edges_.at(j)->damping_components_.clear();
+    }
+    void setIncomingDampingComponents(size_t j, const double* damping, int n) override {
+      if (n != LieDim_) {
+        throw std::invalid_argument("setIncomingDampingComponents: one value per tangent dimension");
+      }
+      auto& ed = *edges_.at(j);
+      ed.damping_components_.assign(damping, damping + n);
+      double mean = 0.0;
+      for (int c = 0; c < n; ++c) {
+        mean += damping[c];
+      }
+      ed.damping_ = mean / n;
     }
     void updateMuAndSigma() override;
     bool hasUnprocessedMessages() const override;

@@ -37,6 +37,8 @@ public:
 
   // ---- Generic rule inputs (core/generic_scheduler.h), computed by the typed variable ----
   static constexpr int kRuleInputs = 15;
+  // Per-component inputs per edge and tangent dimension (EdgeBase::component_inputs_)
+  static constexpr int kComponentInputs = 3;
   virtual int lieDim() const = 0;
   virtual void ruleReset()   = 0;
   // Rows (one per edge, kRuleInputs columns, row stride `stride`) of the variable's rule inputs;
@@ -49,6 +51,8 @@ public:
   virtual void ruleRecordSends(const std::vector<int>& mask, long tick) = 0;
   // Set the damping of the incoming factor-to-variable message on edge j
   virtual void setIncomingDamping(size_t j, double d) = 0;
+  // Set a damping per tangent component (n = lieDim() values) of the incoming message on edge j
+  virtual void setIncomingDampingComponents(size_t j, const double* damping, int n) = 0;
 
   // Send the belief instead of per-edge messages (one computation, same for every edge); factors
   // recover the per-edge messages exactly. Off by default.

@@ -296,6 +296,8 @@ namespace gsolver {
       e->v_osc_has_delta_ = false;
       e->v_osc_cos_       = 0.0;
       e->v_osc_ratio_     = 0.0;
+      e->v_osc_component_.setZero();
+      e->component_inputs_.clear();
       e->last_sent_sigma_ = Sigma_;
       e->kl_ref_valid_    = false;
       e->kl_cav_valid_    = false;
@@ -419,6 +421,7 @@ namespace gsolver {
       const double disagree = std::sqrt(std::max(Lmr.dot(combined.solve(Lbr)), 0.0) / d);
       // oscillation of the incoming message, in the belief's metric
       double cos = ed.v_osc_cos_, ratio = ed.v_osc_ratio_;
+      VectorLieDim osc_c = ed.v_osc_component_;
       // an unchanged message (bitwise) has a zero change: nothing to update, skip the logarithm
       const bool msg_changed = !ed.v_osc_has_prev_ ||
                                std::memcmp(&ed.v_osc_prev_, &msg.mu_, sizeof(msg.mu_)) != 0;
@@ -433,12 +436,19 @@ namespace gsolver {
               cos                = inner / (std::sqrt(sq) * a);
               ratio              = std::clamp(inner / (a * a), -5.0, 5.0);
             }
+            // per component, in its own standard deviations: changes below kSigmaFloor count as none
+            for (long c = 0; c < delta.size(); ++c) {
+              const double sc = std::sqrt(std::max(Sigma_(c, c), 1e-300));
+              const double x = delta[c] / sc, y = ed.v_osc_delta_[c] / sc;
+              osc_c[c] = (std::abs(x) > kSigmaFloor || std::abs(y) > kSigmaFloor) ? 2.0 * x * y / (x * x + y * y) : 0.0;
+            }
           }
           if (update) {
             ed.v_osc_delta_     = delta;
             ed.v_osc_has_delta_ = true;
             ed.v_osc_cos_       = cos;
             ed.v_osc_ratio_     = ratio;
+            ed.v_osc_component_ = osc_c;
           }
         }
       }
@@ -461,6 +471,20 @@ namespace gsolver {
       const double tr_abs    = (1 - kTrendRate) * ed.hist_trend_abs_ema_ + kTrendRate * std::abs(tr);
       row[10]                = tr_abs > 1e-12 ? tr_ema / tr_abs : 0.0;
       row[11]                = std::log(tr_abs + 1e-6);
+      // per tangent component c (kVariableComponentInputNames): movement since the last send in c's
+      // standard deviations relative to the edge's movement (per dim); oscillation of c in the incoming
+      // message; the share of c's precision this message provides (Lambda_m,cc Sigma_cc)
+      {
+        const VectorLieDim dmj = V::boxminus(ed.last_sent_mu_, mu_);
+        auto& ci = ed.component_inputs_;
+        ci.resize(static_cast<size_t>(kComponentInputs) * dmj.size());
+        for (long c = 0; c < dmj.size(); ++c) {
+          const double var = std::max(Sigma_(c, c), 1e-300);
+          ci[kComponentInputs * c + 0] = std::log((std::abs(dmj[c]) / std::sqrt(var) + kSigmaFloor) / (moved[j] + kSigmaFloor));
+          ci[kComponentInputs * c + 1] = osc_c[c];
+          ci[kComponentInputs * c + 2] = std::log(std::max(msg.Lambda_(c, c), 0.0) * var + e);
+        }
+      }
       // KL(N(mu, Sigma) || N(mu_s, Sigma_s)) per dimension, (mu_s, Sigma_s) the belief at the last send:
       // 0.5 (tr(Lambda_s Sigma) - d + log det Sigma_s - log det Sigma + dm^T Lambda_s dm)
       if (!ed.kl_ref_valid_) {

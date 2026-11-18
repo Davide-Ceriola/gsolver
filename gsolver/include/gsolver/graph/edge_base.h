@@ -1,6 +1,7 @@
 #pragma once
 
 #include <string>
+#include <vector>
 
 namespace gsolver {
 
@@ -27,6 +28,13 @@ namespace gsolver {
     // ---- Scheduling state set by schedulers (plain data) ----
     // Damping of the factor-to-variable message on this edge; negative: the factor's own
     double damping_ = -1.0;
+    // Per-component damping of that message, one value per tangent dimension
+    // (VariableNodeBase::setIncomingDampingComponents; empty: damping_ for every component). When set,
+    // damping_ holds their mean, which mixes the precisions; the mean moves per component.
+    std::vector<double> damping_components_;
+    // Per-component rule inputs of the variable on this edge (kComponentInputs per tangent dimension,
+    // dimension-major; kVariableComponentInputNames), written by the variable's ruleInputs
+    std::vector<double> component_inputs_;
     // Factor-side scheduling (FactorNodeBase::sendRepliesIfPending): the factor has new
     // information for this variable it has not sent yet / may reply on this edge now
     bool reply_pending_ = false;

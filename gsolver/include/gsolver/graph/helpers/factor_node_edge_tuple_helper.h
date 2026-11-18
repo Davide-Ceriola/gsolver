@@ -95,7 +95,7 @@ namespace gsolver {
                        computeMessage<CurrentVariableType, out_offset_, a_size, b_size>(
                          etaExcluding<VariablesDim_, out_offset_, a_size>(factor_eta, incoming_eta), factor_Lambdaprime,
                          conditioned_Lambdaprime, outgoingPoint(at_lin_point)),
-                       update, current_edge_->damping_)
+                       update, current_edge_->damping_, &current_edge_->damping_components_)
             ? 1
             : 0;
         return;
@@ -123,7 +123,7 @@ namespace gsolver {
                                          computeMessage<CurrentVariableType, out_offset_, a_size, b_size>(
                                            etaExcluding<VariablesDim_, out_offset_, a_size>(factor_eta, incoming_eta),
                                            factor_Lambdaprime, conditioned_Lambdaprime, outgoingPoint(at_lin_point)),
-                                         update, current_edge_->damping_);
+                                         update, current_edge_->damping_, &current_edge_->damping_components_);
       current_edge_->f2v_sent_ += stored;
       // Send messages to the rest of the variable nodes
       return stored + RestFactorEdgeTuple::template sendAllMessages<VariablesDim_, next_out_offset>(
@@ -249,7 +249,7 @@ namespace gsolver {
                                          computeMessage<CurrentVariableType, out_offset_, a_size, b_size>(
                                            etaExcluding<VariablesDim_, out_offset_, a_size>(factor_eta, incoming_eta),
                                            factor_Lambdaprime, conditioned_Lambdaprime, outgoingPoint(at_lin_point)),
-                                         update, current_edge_->damping_);
+                                         update, current_edge_->damping_, &current_edge_->damping_components_);
       current_edge_->reply_pending_ = false;
       current_edge_->f2v_sent_ += stored;
       return stored;
@@ -366,7 +366,7 @@ namespace gsolver {
                        computeMessage<CurrentVariableType, out_offset_, a_size, b_size>(
                          etaExcluding<VariablesDim_, out_offset_, a_size>(factor_eta, incoming_eta), factor_Lambdaprime,
                          conditioned_Lambdaprime, outgoingPoint(at_lin_point)),
-                       update, current_edge_->damping_)
+                       update, current_edge_->damping_, &current_edge_->damping_components_)
             ? 1
             : 0;
         return;
@@ -390,7 +390,7 @@ namespace gsolver {
                                          computeMessage<CurrentVariableType, out_offset_, a_size, b_size>(
                                            etaExcluding<VariablesDim_, out_offset_, a_size>(factor_eta, incoming_eta),
                                            factor_Lambdaprime, conditioned_Lambdaprime, outgoingPoint(at_lin_point)),
-                                         update, current_edge_->damping_);
+                                         update, current_edge_->damping_, &current_edge_->damping_components_);
       current_edge_->f2v_sent_ += stored;
       return stored;
     }
@@ -510,7 +510,7 @@ namespace gsolver {
                                          computeMessage<CurrentVariableType, out_offset_, a_size, b_size>(
                                            etaExcluding<VariablesDim_, out_offset_, a_size>(factor_eta, incoming_eta),
                                            factor_Lambdaprime, conditioned_Lambdaprime, outgoingPoint(at_lin_point)),
-                                         update, current_edge_->damping_);
+                                         update, current_edge_->damping_, &current_edge_->damping_components_);
       current_edge_->reply_pending_ = false;
       current_edge_->f2v_sent_ += stored;
       return stored;

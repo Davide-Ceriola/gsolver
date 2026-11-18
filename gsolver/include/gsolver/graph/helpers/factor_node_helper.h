@@ -1,6 +1,7 @@
 #pragma once
 
 #include <Eigen/Dense>
+#include <vector>
 
 #include <gsolver/graph/message_update.h>
 #include <gsolver/maths/lie_options.h>
@@ -98,7 +99,7 @@ namespace gsolver {
   // is marked unprocessed (fresh messages are), for schedulers that track what is new.
   template <typename VariableType>
   static bool storeMessage(Message<VariableType>& stored, const Message<VariableType>& fresh, MessageUpdate& update,
-                           double damping_override = -1.0) {
+                           double damping_override = -1.0, const std::vector<double>* components = nullptr) {
     using MatrixLieDim = typename Message<VariableType>::MatrixLieDim;
     if (stored.Lambda_.isZero(0.0) || fresh.Lambda_.isZero(0.0)) {
       stored = fresh;
@@ -124,7 +125,16 @@ namespace gsolver {
     }
     MatrixLieDim Lambda  = (1.0 - damping) * fresh.Lambda_ + damping * stored.Lambda_;
     symmetrize(Lambda);
-    stored.mu_        = VariableType::boxplus(fresh.mu_, damping * VariableType::boxminus(fresh.mu_, stored.mu_));
+    auto offset = VariableType::boxminus(fresh.mu_, stored.mu_).eval();
+    if (damping_override >= 0.0 && components != nullptr && static_cast<long>(components->size()) == offset.size()) {
+      // per-component damping (the precision mixes with their mean, damping_override)
+      for (long c = 0; c < offset.size(); ++c) {
+        offset[c] *= (*components)[c];
+      }
+    } else {
+      offset *= damping;
+    }
+    stored.mu_        = VariableType::boxplus(fresh.mu_, offset);
     stored.Lambda_    = Lambda;
     stored.processed_ = false;
     return true;

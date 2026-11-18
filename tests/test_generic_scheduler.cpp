@@ -318,3 +318,95 @@ TEST(GenericScheduler, MemoryInputs) {
     EXPECT_DOUBLE_EQ(X(r, settle), 0.0);
   }
 }
+
+TEST(GenericScheduler, ComponentDampingWithEqualComponentsIsTheScalarDamping) {
+  // A component head with no weights gives every component the scalar head's damping: the same GBP
+  ScaledLoop a, b;
+  buildScaledLoop(a, 8, 3, 1.0);
+  buildScaledLoop(b, 8, 3, 1.0);
+  VariableRule va;
+  va.damping = someHead(VariableNodeBase::kRuleInputs, 4, 0.9);
+  VariableRule vb = va;
+  vb.damping_components.active = true; // no features, intercept 0
+  GenericScheduler sa(a.graph, va, {}, 0), sb(b.graph, vb, {}, 0);
+  for (int it = 0; it < 30; ++it) {
+    sa.tick();
+    sb.tick();
+    for (size_t k = 0; k < a.poses.size(); ++k) {
+      ASSERT_LT(se2Error(a.poses[k]->mu_, b.poses[k]->mu_).norm(), 1e-12) << "tick " << it;
+    }
+  }
+  // and the per-component values were set
+  EXPECT_EQ(b.graph.variable_nodes_[0]->getEdgeAt(0)->damping_components_.size(), 3u);
+}
+
+TEST(GenericScheduler, ComponentDampingMovesEachComponentByItsOwnShare) {
+  Message<SE2Pose> stored, fresh;
+  stored.mu_     = se2(1.0, 2.0, 0.3);
+  fresh.mu_      = se2(1.5, 1.0, 0.1);
+  stored.Lambda_ = Eigen::Matrix3d::Identity() * 4.0;
+  fresh.Lambda_  = Eigen::Matrix3d::Identity() * 2.0;
+  const auto offset = SE2Pose::boxminus(fresh.mu_, stored.mu_).eval();
+  const std::vector<double> comp{0.0, 1.0, 0.5};
+  MessageUpdate update;
+  Message<SE2Pose> out = stored;
+  ASSERT_TRUE(storeMessage(out, fresh, update, 0.5, &comp));
+  const auto got = SE2Pose::boxminus(fresh.mu_, out.mu_).eval();
+  EXPECT_NEAR(got[0], 0.0, 1e-12);
+  EXPECT_NEAR(got[1], offset[1], 1e-12);
+  EXPECT_NEAR(got[2], 0.5 * offset[2], 1e-12);
+  EXPECT_TRUE(out.Lambda_.isApprox(Eigen::Matrix3d::Identity() * 3.0, 1e-12)); // mixed with the mean, 0.5
+  // without components: the scalar damping on every component
+  Message<SE2Pose> scalar = stored;
+  ASSERT_TRUE(storeMessage(scalar, fresh, update, 0.5));
+  EXPECT_TRUE(SE2Pose::boxminus(fresh.mu_, scalar.mu_).isApprox(0.5 * offset, 1e-12));
+}
+
+TEST(GenericScheduler, ComponentInputsDoNotDependOnTheUnits) {
+  ScaledLoop a, b;
+  buildScaledLoop(a, 8, 2, 1.0);
+  buildScaledLoop(b, 8, 2, 10.0);
+  VariableRule vr;
+  vr.send    = someHead(VariableNodeBase::kRuleInputs, 3);
+  vr.damping = someHead(VariableNodeBase::kRuleInputs, 4, 0.9);
+  vr.damping_components = someHead(VariableNodeBase::kComponentInputs, 8);
+  GenericScheduler sa(a.graph, vr, {}, 11), sb(b.graph, vr, {}, 11);
+  std::mt19937 rng(7);
+  std::uniform_real_distribution<double> unit(0.0, 1.0);
+  for (int it = 0; it < 30; ++it) {
+    sa.variableFeatures(false);
+    sb.variableFeatures(false);
+    const Eigen::MatrixXd Za = sa.componentFeatures(), Zb = sb.componentFeatures();
+    ASSERT_EQ(Za.rows(), static_cast<Eigen::Index>(sa.numberOfEdges() * 3));
+    Eigen::Index r, c;
+    const double worst = (Za - Zb).cwiseAbs().maxCoeff(&r, &c);
+    ASSERT_LT(worst, 1e-2) << "component inputs, tick " << it << ", input " << kVariableComponentInputNames[c] << " row "
+                           << r << ": " << Za(r, c) << " vs " << Zb(r, c);
+    Eigen::VectorXd u(sa.numberOfEdges());
+    for (int q = 0; q < u.size(); ++q) {
+      u[q] = unit(rng);
+    }
+    const TickCounts ca = sa.tick(u), cb = sb.tick(u);
+    ASSERT_EQ(ca.variable_to_factor, cb.variable_to_factor) << "tick " << it;
+  }
+}
+
+TEST(GenericScheduler, ComponentOscillationIsBoundedAndSetterChecksSizes) {
+  ScaledLoop l;
+  buildScaledLoop(l, 8, 5, 1.0);
+  VariableRule vr;
+  GenericScheduler s(l.graph, vr, {}, 1);
+  for (int it = 0; it < 30; ++it) {
+    s.tick();
+    s.variableFeatures(false);
+    const Eigen::MatrixXd Z = s.componentFeatures();
+    for (int r = 0; r < Z.rows(); ++r) {
+      ASSERT_GE(Z(r, 1), -1.0 - 1e-12);
+      ASSERT_LE(Z(r, 1), 1.0 + 1e-12);
+      ASSERT_TRUE(Z.row(r).allFinite());
+    }
+  }
+  EXPECT_THROW(s.setIncomingDampingComponents(std::vector<double>(3)), std::invalid_argument);
+  s.setIncomingDampingComponents(std::vector<double>(s.numberOfEdges() * 3, 0.2));
+  EXPECT_DOUBLE_EQ(l.graph.variable_nodes_[1]->getEdgeAt(0)->damping_, 0.2);
+}
